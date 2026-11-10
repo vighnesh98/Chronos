@@ -795,11 +795,26 @@
   <div id="settingsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 hidden">
     <div class="bg-white rounded-3xl max-w-md w-full p-5 shadow-2xl border border-slate-100 fade-enter">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">OAuth Configuration</h4>
+        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">OAuth & Cloud Settings</h4>
         <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <label class="block text-[11px] font-semibold text-slate-600 mb-1">Google OAuth 2.0 Client ID</label>
-      <input type="text" id="clientIdInput" placeholder="xxxx-xxxx.apps.googleusercontent.com" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-4" />
+      <input type="text" id="clientIdInput" placeholder="xxxx-xxxx.apps.googleusercontent.com" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-3" />
+
+      <!-- Manual Google Spreadsheet Link / ID -->
+      <label class="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center justify-between">
+        <span>Google Spreadsheet URL or ID (Optional)</span>
+        <span class="text-[9px] text-slate-400 font-normal">Auto-detected if empty</span>
+      </label>
+      <input type="text" id="sheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/... or ID" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-3" />
+
+      <!-- Manual Google Drive JSON Link / ID -->
+      <label class="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center justify-between">
+        <span>Drive JSON File URL or ID (Optional)</span>
+        <span class="text-[9px] text-slate-400 font-normal">Auto-detected if empty</span>
+      </label>
+      <input type="text" id="jsonUrlInput" placeholder="https://drive.google.com/file/d/... or ID" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-4" />
+
       <div class="flex justify-end gap-2">
         <button onclick="closeSettingsModal()" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">Cancel</button>
         <button onclick="saveSettings()" class="px-4 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold shadow-sm hover:bg-brand-700">Save</button>
@@ -821,6 +836,7 @@
     const STORAGE_KEY_TASKS = 'chronos_tasks_state';
     const STORAGE_KEY_CLIENT_ID = 'chronos_client_id';
     const STORAGE_KEY_SHEET_ID = 'chronos_sheet_id';
+    const STORAGE_KEY_DRIVE_FILE_ID = 'chronos_drive_file_id';
     const STORAGE_KEY_SUBSCRIPTION = 'chronos_subscription_state';
 
     const PLAN_SECRET_CODE = '@@112267';
@@ -1008,7 +1024,7 @@
     // App Initialization & State
     // ----------------------------------------------------
     window.addEventListener('load', () => {
-      loadClientId();
+      loadSettingsInputs();
       loadSubscription();
       loadTasks();
       checkMidnightReset();
@@ -1109,11 +1125,22 @@
       document.getElementById('comingSoonModal').classList.add('hidden');
     }
 
-    function loadClientId() {
-      const saved = localStorage.getItem(STORAGE_KEY_CLIENT_ID);
-      if (saved) {
-        document.getElementById('clientIdInput').value = saved;
-      }
+    function extractGoogleFileId(val) {
+      if (!val) return '';
+      const str = val.trim();
+      const match = str.match(/[-\w]{25,}/);
+      return match ? match[0] : str;
+    }
+
+    function loadSettingsInputs() {
+      const savedCid = localStorage.getItem(STORAGE_KEY_CLIENT_ID);
+      if (savedCid) document.getElementById('clientIdInput').value = savedCid;
+
+      const savedSheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
+      if (savedSheetId) document.getElementById('sheetUrlInput').value = savedSheetId;
+
+      const savedJsonId = localStorage.getItem(STORAGE_KEY_DRIVE_FILE_ID);
+      if (savedJsonId) document.getElementById('jsonUrlInput').value = savedJsonId;
     }
 
     function getClientId() {
@@ -1121,12 +1148,34 @@
     }
 
     function saveSettings() {
-      const val = document.getElementById('clientIdInput').value.trim();
-      localStorage.setItem(STORAGE_KEY_CLIENT_ID, val);
+      const cid = document.getElementById('clientIdInput').value.trim();
+      localStorage.setItem(STORAGE_KEY_CLIENT_ID, cid);
+
+      const rawSheet = document.getElementById('sheetUrlInput').value.trim();
+      const rawJson = document.getElementById('jsonUrlInput').value.trim();
+
+      const parsedSheetId = extractGoogleFileId(rawSheet);
+      const parsedJsonId = extractGoogleFileId(rawJson);
+
+      if (parsedSheetId) {
+        localStorage.setItem(STORAGE_KEY_SHEET_ID, parsedSheetId);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_SHEET_ID);
+      }
+
+      if (parsedJsonId) {
+        localStorage.setItem(STORAGE_KEY_DRIVE_FILE_ID, parsedJsonId);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_DRIVE_FILE_ID);
+      }
+
       closeSettingsModal();
-      showToast('Client ID Saved');
+      showToast('Settings saved successfully');
+
       if (!accessToken) {
         requestGoogleToken();
+      } else {
+        syncWithDriveAndSheets();
       }
     }
 
@@ -1237,7 +1286,7 @@
 
             updateAuthUI(true);
             showToast('Signed in successfully');
-            ensureSpreadsheetExists();
+            syncWithDriveAndSheets();
           } else {
             showToast('Sign-in cancelled or failed');
           }
@@ -1842,69 +1891,143 @@
     }
 
     // ----------------------------------------------------
+    // Unified Multi-Device Drive & Sheets Discovery Engine
+    // ----------------------------------------------------
+    async function syncWithDriveAndSheets() {
+      if (!accessToken) return;
+      try {
+        await resolveDriveJsonFile();
+        await ensureSpreadsheetExists();
+        syncToDrive();
+      } catch (e) {}
+    }
+
+    async function resolveDriveJsonFile() {
+      if (!accessToken) return null;
+      let driveFileId = localStorage.getItem(STORAGE_KEY_DRIVE_FILE_ID);
+
+      // 1. Verify manually assigned or cached JSON file ID if present
+      if (driveFileId) {
+        try {
+          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=id,trashed`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          const meta = await res.json();
+          if (meta && !meta.trashed && meta.id) {
+            await pullDataFromDriveJson(meta.id);
+            return meta.id;
+          }
+        } catch (e) {}
+      }
+
+      // 2. Query Drive for existing non-trashed chronos_task_data.json
+      try {
+        const query = encodeURIComponent("name = 'chronos_task_data.json' and trashed = false");
+        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed)&orderBy=modifiedTime desc`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const data = await searchRes.json();
+        if (data.files && data.files.length > 0) {
+          driveFileId = data.files[0].id;
+          localStorage.setItem(STORAGE_KEY_DRIVE_FILE_ID, driveFileId);
+          await pullDataFromDriveJson(driveFileId);
+          return driveFileId;
+        }
+      } catch (e) {}
+
+      // 3. Create fresh chronos_task_data.json in Drive if no file exists
+      try {
+        const meta = { name: 'chronos_task_data.json', mimeType: 'application/json' };
+        const payload = JSON.stringify({
+          updatedAt: new Date().toISOString(),
+          subscriptionExpiry: subscriptionExpiry,
+          spreadsheetId: localStorage.getItem(STORAGE_KEY_SHEET_ID) || null,
+          tasks: tasks
+        });
+
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+        form.append('file', new Blob([payload], { type: 'application/json' }));
+
+        const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: form
+        });
+        const created = await createRes.json();
+        if (created && created.id) {
+          driveFileId = created.id;
+          localStorage.setItem(STORAGE_KEY_DRIVE_FILE_ID, driveFileId);
+          return driveFileId;
+        }
+      } catch (e) {}
+
+      return null;
+    }
+
+    async function pullDataFromDriveJson(fileId) {
+      if (!accessToken || !fileId) return;
+      try {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const data = await res.json();
+        if (!data) return;
+
+        let stateChanged = false;
+
+        // Adopt linked spreadsheet ID from cloud JSON if current device doesn't have one
+        if (data.spreadsheetId && !localStorage.getItem(STORAGE_KEY_SHEET_ID)) {
+          localStorage.setItem(STORAGE_KEY_SHEET_ID, data.spreadsheetId);
+        }
+
+        // Adopt subscription if cloud has higher validity
+        if (data.subscriptionExpiry && data.subscriptionExpiry > subscriptionExpiry) {
+          subscriptionExpiry = data.subscriptionExpiry;
+          localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
+          updateSubscriptionTicker();
+          enforceSubscriptionCheck();
+        }
+
+        // Adopt task state if local tasks are empty
+        if (Array.isArray(data.tasks) && data.tasks.length > 0 && tasks.length === 0) {
+          tasks = data.tasks;
+          localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+          stateChanged = true;
+        }
+
+        if (stateChanged) {
+          renderTasks();
+          updateHeroMetrics();
+        }
+      } catch (e) {}
+    }
+
+    // ----------------------------------------------------
     // Google Sheets & Drive Cloud Sync
     // ----------------------------------------------------
     async function syncToDrive() {
       if (!accessToken || isSyncingToDrive) return;
       isSyncingToDrive = true;
       try {
-        const currentSheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID) || null;
-        const content = JSON.stringify({
+        let driveFileId = localStorage.getItem(STORAGE_KEY_DRIVE_FILE_ID);
+        if (!driveFileId) {
+          driveFileId = await resolveDriveJsonFile();
+        }
+        if (!driveFileId) return;
+
+        const payloadContent = JSON.stringify({
           updatedAt: new Date().toISOString(),
           subscriptionExpiry: subscriptionExpiry,
-          spreadsheetId: currentSheetId,
+          spreadsheetId: localStorage.getItem(STORAGE_KEY_SHEET_ID) || null,
           tasks: tasks
         });
 
-        const searchRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=name='chronos_task_data.json'+and+trashed=false`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        const searchData = await searchRes.json();
-
-        if (searchData.files && searchData.files.length > 0) {
-          const fileId = searchData.files[0].id;
-          try {
-            const existingFileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-              headers: { Authorization: `Bearer ${accessToken}` }
-            });
-            const existingJson = await existingFileRes.json();
-            if (existingJson) {
-              if (existingJson.subscriptionExpiry && existingJson.subscriptionExpiry > subscriptionExpiry) {
-                subscriptionExpiry = existingJson.subscriptionExpiry;
-                localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
-              }
-              // If current device lacks sheet ID or drive has an active sheet ID, adopt it
-              if (existingJson.spreadsheetId && !localStorage.getItem(STORAGE_KEY_SHEET_ID)) {
-                localStorage.setItem(STORAGE_KEY_SHEET_ID, existingJson.spreadsheetId);
-              }
-            }
-          } catch(e) {}
-
-          const payloadContent = JSON.stringify({
-            updatedAt: new Date().toISOString(),
-            subscriptionExpiry: subscriptionExpiry,
-            spreadsheetId: localStorage.getItem(STORAGE_KEY_SHEET_ID) || currentSheetId,
-            tasks: tasks
-          });
-
-          await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-            method: 'PATCH',
-            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: payloadContent
-          });
-        } else {
-          const meta = { name: 'chronos_task_data.json', mimeType: 'application/json' };
-          const form = new FormData();
-          form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-          form.append('file', new Blob([content], { type: 'application/json' }));
-
-          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${accessToken}` },
-            body: form
-          });
-        }
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: payloadContent
+        });
       } catch (err) {
       } finally {
         isSyncingToDrive = false;
@@ -1915,7 +2038,7 @@
       if (!accessToken) return null;
       let sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
 
-      // Step 1: If an ID is cached locally, verify it's still alive and not trashed
+      // Step 1: If manual or cached sheetId exists, verify it is accessible and not trashed
       if (sheetId) {
         try {
           const res = await fetch(`https://www.googleapis.com/drive/v3/files/${sheetId}?fields=id,trashed`, {
@@ -1926,49 +2049,22 @@
         } catch(e) {}
       }
 
-      // Step 2: Cross-Device Check - Inspect Drive for chronos_task_data.json
-      try {
-        const driveDataRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=name='chronos_task_data.json'+and+trashed=false`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        const driveData = await driveDataRes.json();
-        if (driveData.files && driveData.files.length > 0) {
-          const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveData.files[0].id}?alt=media`, {
-            headers: { Authorization: `Bearer ${accessToken}` }
-          });
-          const cloudConfig = await fileRes.json();
-          if (cloudConfig && cloudConfig.spreadsheetId) {
-            // Verify this spreadsheet ID is valid and not trashed
-            const sheetCheckRes = await fetch(`https://www.googleapis.com/drive/v3/files/${cloudConfig.spreadsheetId}?fields=id,trashed`, {
-              headers: { Authorization: `Bearer ${accessToken}` }
-            });
-            const sheetMeta = await sheetCheckRes.json();
-            if (sheetMeta && !sheetMeta.trashed && sheetMeta.id) {
-              sheetId = sheetMeta.id;
-              localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
-              return sheetId;
-            }
-          }
-        }
-      } catch(e) {}
-
-      // Step 3: Search Drive directly by name for existing 'Chronos Focus Logs' spreadsheet
+      // Step 2: Search Drive for any non-trashed spreadsheet named 'Chronos Focus Logs'
       try {
         const query = encodeURIComponent("name = 'Chronos Focus Logs' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
-        const searchSheetRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed)`, {
+        const searchSheetRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed)&orderBy=modifiedTime desc`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const sheetSearchResults = await searchSheetRes.json();
         if (sheetSearchResults.files && sheetSearchResults.files.length > 0) {
           sheetId = sheetSearchResults.files[0].id;
           localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
-          syncToDrive(); // propagate found sheetId back to Drive JSON
+          syncToDrive();
           return sheetId;
         }
       } catch(e) {}
 
-      // Step 4: If and only if no spreadsheet exists anywhere in the user's Drive, create a new one
+      // Step 3: Only if no spreadsheet exists anywhere in Drive, create a new one
       try {
         const payload = {
           properties: { title: 'Chronos Focus Logs' },
@@ -1990,7 +2086,7 @@
           body: JSON.stringify({ values: headers })
         });
 
-        // Immediately update Drive JSON with the new spreadsheet ID
+        // Persist newly created sheetId into Drive JSON
         syncToDrive();
 
         return sheetId;

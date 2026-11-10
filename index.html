@@ -330,7 +330,7 @@
       </div>
 
       <div class="pt-4 border-t border-slate-100 text-center">
-        <p class="text-[11px] font-medium text-slate-400">Chronos v3.3 &bull; Organized Sheet 2 Table</p>
+        <p class="text-[11px] font-medium text-slate-400">Chronos v3.4 &bull; Strict Non-Overwrite Mode</p>
       </div>
     </aside>
 
@@ -546,7 +546,7 @@
     </div>
   </div>
 
-  <!-- Trophy Collection & Streak Modal (Stackable + Deduction Rules) -->
+  <!-- Trophy Collection & Streak Modal -->
   <div id="trophiesModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-3 sm:p-5 hidden overflow-y-auto">
     <div class="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl border border-slate-100 fade-enter relative overflow-hidden my-auto max-h-[92vh] flex flex-col">
       <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
@@ -2640,12 +2640,14 @@
         const sheetId = await ensureSpreadsheetExists();
         if (sheetId) {
           // Strictly read and hydrate from Sheet 2 FIRST
-          await pullStateFromSpreadsheet();
-          // Now mark cloud hydrated so future explicit user actions can sync
-          isCloudHydrated = true;
+          const readSuccess = await pullStateFromSpreadsheet();
+          // Only unlock outbound writes if we successfully connected and pulled state
+          if (readSuccess) {
+            isCloudHydrated = true;
+          }
         }
       } catch(e) {
-        isCloudHydrated = true;
+        // Do NOT unlock outbound writes if connection failed to avoid overwriting cloud with stale local cache
       }
     }
 
@@ -2739,11 +2741,11 @@
     // STRICT INBOUND READ: Reads the key-value table from Sheet 2 (App_State)
     async function pullStateFromSpreadsheet() {
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
-      if (!accessToken || !sheetId) return;
+      if (!accessToken || !sheetId) return false;
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
         // Fetch the full organized range A1:B20 from App_State
         const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B20`, {
@@ -2752,16 +2754,18 @@
         });
         clearTimeout(timeoutId);
 
+        if (!res.ok) return false;
+
         const data = await res.json();
         const rows = data.values || [];
-        if (!rows.length) return;
+        if (!rows.length) return false;
 
         // Check if Sheet 2 still has legacy single-cell JSON in A1
         if (rows[0] && rows[0][0] && rows[0][0].trim().startsWith('{')) {
           try {
             const legacyState = JSON.parse(rows[0][0]);
             applyCloudStateObject(legacyState);
-            return;
+            return true;
           } catch(e) {}
         }
 
@@ -2775,7 +2779,7 @@
           }
         });
 
-        // 1. Points (Directly adopts userPoints - e.g. 1000 from cell B2)
+        // 1. Points (Strictly adopts whatever value is in the spreadsheet)
         if (tableMap['User_Points'] !== undefined && tableMap['User_Points'] !== '') {
           userPoints = Number(tableMap['User_Points']) || 0;
         }
@@ -2843,7 +2847,10 @@
         applyActiveThemeUI();
         updateShopThemesUI();
 
-      } catch(e) {}
+        return true;
+      } catch(e) {
+        return false;
+      }
     }
 
     function applyCloudStateObject(cloudState) {

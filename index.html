@@ -89,6 +89,7 @@
       z-index: 0;
       background-size: cover;
       background-position: center;
+      background-repeat: no-repeat;
       opacity: 0.28;
       transition: opacity 0.4s ease, background-image 0.4s ease;
     }
@@ -101,7 +102,7 @@
       transition: background-color 0.3s ease, border-color 0.3s ease;
     }
 
-    /* Midnight Slate Theme overrides */
+    /* Midnight Slate Theme */
     body.theme-midnight {
       background-color: #0b0f19 !important;
       color: #e2e8f0 !important;
@@ -115,7 +116,7 @@
       border-color: rgba(55, 65, 81, 0.8) !important;
     }
 
-    /* Emerald Forest Theme overrides */
+    /* Emerald Forest Theme */
     body.theme-emerald {
       background-color: #061e18 !important;
       color: #ecfdf5 !important;
@@ -163,7 +164,7 @@
 </head>
 <body class="text-slate-800 antialiased selection:bg-brand-500 selection:text-white min-h-screen relative flex flex-col justify-between">
   
-  <!-- Background Animated Bubbles & Custom Wallpaper -->
+  <!-- Background Animated Bubbles & Custom Wallpaper Layer -->
   <div id="customWallpaperBg" class="hidden"></div>
   <canvas id="bubbleCanvas"></canvas>
 
@@ -174,7 +175,7 @@
         <i class="fa-solid fa-arrows-rotate fa-spin"></i>
       </div>
       <h3 class="text-sm font-black text-slate-900">Synchronizing with Cloud</h3>
-      <p id="cloudSyncStatusText" class="text-xs text-slate-500 mt-1">Connecting to your Google Spreadsheet and loading your latest focus records...</p>
+      <p id="cloudSyncStatusText" class="text-xs text-slate-500 mt-1">Connecting to Google Sheets and fetching your latest focus records...</p>
     </div>
   </div>
 
@@ -222,11 +223,11 @@
         </div>
       </div>
 
-      <!-- Right Header -->
+      <!-- Right Header: Points Pill + Install + User Profile -->
       <div class="flex items-center gap-2">
         <!-- Live Points Pill -->
         <div onclick="openShopModal()" class="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 text-xs font-black border border-amber-200/80 shadow-2xs hover:bg-amber-100 transition active:scale-95">
-          <i class="fa-solid fa-coins text-amber-500 animate-bounce"></i>
+          <i class="fa-solid fa-coins text-amber-500"></i>
           <span id="headerPointsCount">0</span>
           <span class="text-[10px] text-amber-600 font-bold uppercase hidden sm:inline">PTS</span>
         </div>
@@ -329,7 +330,7 @@
       </div>
 
       <div class="pt-4 border-t border-slate-100 text-center">
-        <p class="text-[11px] font-medium text-slate-400">Chronos v3.1 &bull; Guaranteed Sync Engine</p>
+        <p class="text-[11px] font-medium text-slate-400">Chronos v3.2 &bull; True Cloud Persistence</p>
       </div>
     </aside>
 
@@ -391,7 +392,7 @@
 
     <!-- Bottom Notice -->
     <footer class="mt-8 text-center text-slate-400 text-[11px] py-2">
-      Chronos Focus &bull; Sheet 1 Activity Logs &bull; Sheet 2 App State & Trophies &bull; Synced Real-Time
+      Chronos Focus &bull; Sheet 1 Activity Logs &bull; Sheet 2 App State &bull; Cloud Authoritative
     </footer>
 
   </div>
@@ -527,7 +528,7 @@
       </div>
       <h4 class="text-base font-black text-slate-900">Google Drive Wallpaper</h4>
       <p id="driveWallpaperModalDesc" class="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
-        Cost: <strong class="text-amber-600">100 Points</strong>. Paste a shared Google Drive image link (<code class="text-[10px] bg-slate-100 px-1 py-0.5 rounded">drive.google.com/file/d/...</code>):
+        Cost: <strong class="text-amber-600">100 Points</strong>. Paste a shared Google Drive image link:
       </p>
 
       <div class="mb-4 text-left">
@@ -564,23 +565,29 @@
       </div>
 
       <div class="overflow-y-auto space-y-6 flex-grow pr-1">
-        <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 border border-amber-200/80 flex items-center justify-between shadow-2xs">
-          <div>
-            <span class="text-[10px] font-black uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
-              <i class="fa-solid fa-fire text-amber-500"></i>
-              8-Hour Daily Streak
-            </span>
-            <div class="flex items-baseline gap-2 mt-1">
-              <h4 id="trophyCurrentStreak" class="text-2xl font-black font-mono text-amber-950">0 Days</h4>
-              <span id="trophyStreakTarget" class="text-xs font-bold text-amber-700">/ 56 Days for Diamond Trophy</span>
+        <!-- Streak Progress Card -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 border border-amber-200/80 shadow-2xs">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-fire text-amber-500"></i>
+                8-Hour Daily Streak
+              </span>
+              <div class="flex items-baseline gap-2 mt-1">
+                <h4 id="trophyCurrentStreak" class="text-2xl font-black font-mono text-amber-950">0 Days</h4>
+                <span id="trophyStreakTarget" class="text-xs font-bold text-amber-700">/ 56 Days for Diamond Trophy</span>
+              </div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-xl shadow-md shadow-amber-500/30">
+              <i class="fa-solid fa-bolt"></i>
             </div>
           </div>
-          <div class="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-xl shadow-md shadow-amber-500/30">
-            <i class="fa-solid fa-bolt"></i>
+          <div class="w-full bg-amber-200/60 rounded-full h-2 mt-3 overflow-hidden">
+            <div id="trophyStreakProgressBar" class="bg-amber-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
           </div>
         </div>
 
-        <!-- 4 Trophy Badges showing actual Stack Count -->
+        <!-- 4 Trophy Badges showing Stack Count -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div id="trophyCardBronze" class="border rounded-2xl p-3.5 text-center transition flex flex-col items-center justify-between border-slate-200">
             <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center text-xl shadow-xs mb-2">
@@ -627,7 +634,7 @@
           </div>
         </div>
 
-        <!-- Grand Bumper Reward with Trophy Cost Info -->
+        <!-- Grand Bumper Reward with Trophy Cost Breakdown -->
         <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
           <div class="flex items-center justify-between mb-2">
             <div>
@@ -636,9 +643,16 @@
             </div>
             <span id="bumperClaimProgressBadge" class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800">Claim 0 / 5</span>
           </div>
-          <p id="bumperClaimRequirementText" class="text-xs text-slate-600 mb-3 leading-relaxed">
-            Next Claim consumes: <strong class="text-slate-900">1 Bronze + 1 Silver Trophy</strong>.
-          </p>
+          
+          <div class="bg-white p-3 rounded-xl border border-slate-200/80 mb-3 text-xs">
+            <p id="bumperClaimRequirementText" class="text-slate-600 font-medium">
+              Next Claim consumes: <strong class="text-slate-900">1 Bronze + 1 Silver Trophy</strong>.
+            </p>
+            <div id="bumperTrophyInventoryCheck" class="flex flex-wrap gap-2 mt-2 text-[11px] font-bold">
+              <!-- Dynamically populated inventory indicators -->
+            </div>
+          </div>
+
           <button id="claimBumperBtn" onclick="claimGrandBumperReward()" class="w-full py-2.5 rounded-xl bg-slate-200 text-slate-400 font-bold text-xs transition flex items-center justify-center gap-2 cursor-not-allowed" disabled>
             <i class="fa-solid fa-gift"></i>
             <span>Claim 100 Points</span>
@@ -1117,9 +1131,9 @@
     let lastAnalyticsFetchTime = 0;
     let dashboardPollingInterval = null;
 
-    // Fail-safe mutexes
+    // Fail-safe mutexes & Hydration protection
     let isStateSyncing = false;
-    let isAppendingSheetRow = false;
+    let isCloudHydrated = false; // Strictly blocks local overwrite before cloud fetch completes
     let periodicSyncInterval = null;
     let lastActiveTaskTimestamp = Date.now();
     let lastInactivityAlertTimestamp = 0;
@@ -1132,7 +1146,7 @@
     let goldenTrophies = 0;
     let hasDiamondTrophy = false;
 
-    // Daily Milestone Celebrated Flags (Prevents multiple popup spam in single day)
+    // Daily Milestone Celebrated Flags
     let todayMilestonesAchieved = { bronze: false, silver: false, golden: false };
 
     let streakCount = 0;
@@ -1410,6 +1424,7 @@
       if (!accessToken) {
         requestGoogleToken();
       } else {
+        isCloudHydrated = false; // Trigger safe re-fetch
         syncWithSpreadsheet();
       }
     }
@@ -1426,7 +1441,9 @@
       localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
       renderTasks();
       updateHeroMetrics();
-      syncStateToSpreadsheet();
+      if (isCloudHydrated) {
+        syncStateToSpreadsheet();
+      }
     }
 
     // ----------------------------------------------------
@@ -1517,6 +1534,7 @@
             updateAuthUI(true);
             showToast('Signed in successfully');
             showSyncLoader();
+            isCloudHydrated = false;
             await syncWithSpreadsheet();
             hideSyncLoader();
           } else {
@@ -1533,6 +1551,7 @@
       }
       accessToken = null;
       userProfile = null;
+      isCloudHydrated = false;
       localStorage.removeItem(STORAGE_KEY_AUTH);
       closeProfileMenu();
       updateAuthUI(false);
@@ -1559,7 +1578,7 @@
       localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, expiryTime.toString());
       updateSubscriptionTicker();
       enforceSubscriptionCheck();
-      syncStateToSpreadsheet();
+      if (isCloudHydrated) syncStateToSpreadsheet();
     }
 
     function isSubscriptionActive() {
@@ -1950,7 +1969,7 @@
     function startPeriodicSheetSync() {
       if (periodicSyncInterval) clearInterval(periodicSyncInterval);
       periodicSyncInterval = setInterval(async () => {
-        if (!accessToken || !isSubscriptionActive()) return;
+        if (!accessToken || !isSubscriptionActive() || !isCloudHydrated) return;
 
         const now = Date.now();
         for (const task of tasks) {
@@ -1983,7 +2002,6 @@
         }
       });
 
-      // Award 1 point for every 1 hour (3600s)
       const fullHours = Math.floor(total / 3600);
       if (fullHours > awardedHourlyPoints) {
         const diff = fullHours - awardedHourlyPoints;
@@ -2106,7 +2124,6 @@
           userPoints = Number(r.userPoints) || 0;
           awardedHourlyPoints = Number(r.awardedHourlyPoints) || 0;
           
-          // Stackable inventories
           bronzeTrophies = Number(r.bronzeTrophies !== undefined ? r.bronzeTrophies : (r.dailyTrophies && r.dailyTrophies.bronze ? 1 : 0)) || 0;
           silverTrophies = Number(r.silverTrophies !== undefined ? r.silverTrophies : (r.dailyTrophies && r.dailyTrophies.silver ? 1 : 0)) || 0;
           goldenTrophies = Number(r.goldenTrophies !== undefined ? r.goldenTrophies : (r.dailyTrophies && r.dailyTrophies.golden ? 1 : 0)) || 0;
@@ -2142,7 +2159,7 @@
         customDriveWallpaperUrl
       };
       localStorage.setItem(STORAGE_KEY_REWARDS, JSON.stringify(payload));
-      syncStateToSpreadsheet();
+      if (isCloudHydrated) syncStateToSpreadsheet();
       updatePointsDisplay();
       updateTrophiesUI();
       updateShopThemesUI();
@@ -2179,17 +2196,14 @@
       showToast(`🎉 Redeemed ${days} Days Pro Pass for ${cost} Points!`);
     }
 
-    // Handles Buy / Equip / Active for Themes
     function handleThemeAction(themeKey, cost) {
       if (unlockedThemes.includes(themeKey)) {
-        // Already owned -> Equip
         activeTheme = themeKey;
         customDriveWallpaperUrl = '';
         saveRewardsState();
         applyActiveThemeUI();
         showToast(`🎨 Theme equipped: ${themeKey.toUpperCase()}!`);
       } else {
-        // Needs Purchase
         if (userPoints < cost) {
           showToast(`⚠️ You need ${cost} points for this theme`);
           return;
@@ -2225,11 +2239,11 @@
           priceMid.textContent = 'EQUIPPED';
         } else if (unlockedThemes.includes('midnight')) {
           btnMid.textContent = 'Equip';
-          btnMid.className = 'px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition';
+          btnMid.className = 'px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition cursor-pointer';
           priceMid.textContent = 'OWNED';
         } else {
           btnMid.textContent = 'Redeem';
-          btnMid.className = 'px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold transition';
+          btnMid.className = 'px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold transition cursor-pointer';
           priceMid.textContent = '15 PTS';
         }
       }
@@ -2244,11 +2258,11 @@
           priceEm.textContent = 'EQUIPPED';
         } else if (unlockedThemes.includes('emerald')) {
           btnEm.textContent = 'Equip';
-          btnEm.className = 'px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold transition';
+          btnEm.className = 'px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold transition cursor-pointer';
           priceEm.textContent = 'OWNED';
         } else {
           btnEm.textContent = 'Redeem';
-          btnEm.className = 'px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold transition';
+          btnEm.className = 'px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold transition cursor-pointer';
           priceEm.textContent = '45 PTS';
         }
       }
@@ -2263,11 +2277,11 @@
           priceCust.textContent = 'EQUIPPED';
         } else if (unlockedThemes.includes('custom_drive')) {
           btnCust.textContent = 'Change / Equip';
-          btnCust.className = 'px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition';
+          btnCust.className = 'px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition cursor-pointer';
           priceCust.textContent = 'OWNED';
         } else {
           btnCust.textContent = 'Configure';
-          btnCust.className = 'px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition';
+          btnCust.className = 'px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition cursor-pointer';
           priceCust.textContent = '100 PTS';
         }
       }
@@ -2329,7 +2343,6 @@
     function applyActiveThemeUI() {
       const wallpaperEl = document.getElementById('customWallpaperBg');
       
-      // Reset classes
       document.body.classList.remove('theme-midnight', 'theme-emerald');
 
       if (activeTheme === 'custom_drive' && customDriveWallpaperUrl) {
@@ -2360,11 +2373,14 @@
       const currentStreakEl = document.getElementById('trophyCurrentStreak');
       if (currentStreakEl) currentStreakEl.textContent = `${streakCount} Day${streakCount === 1 ? '' : 's'}`;
 
+      const streakProgress = Math.min(100, Math.round((streakCount / 56) * 100));
+      const progressBar = document.getElementById('trophyStreakProgressBar');
+      if (progressBar) progressBar.style.width = `${streakProgress}%`;
+
       const totalOwned = bronzeTrophies + silverTrophies + goldenTrophies + (hasDiamondTrophy ? 1 : 0);
       const drawerBadge = document.getElementById('drawerTrophyBadge');
       if (drawerBadge) drawerBadge.textContent = `${totalOwned} Total`;
 
-      // Update Card Visuals & Stack Count Badges
       const bronzeEl = document.getElementById('trophyCountBronze');
       const silverEl = document.getElementById('trophyCountSilver');
       const goldenEl = document.getElementById('trophyCountGolden');
@@ -2383,7 +2399,6 @@
         }
       }
 
-      // Card highlight states based on inventory > 0
       const setCardState = (cardId, isOwned) => {
         const card = document.getElementById(cardId);
         if (!card) return;
@@ -2401,15 +2416,16 @@
       setCardState('trophyCardGolden', goldenTrophies > 0);
       setCardState('trophyCardDiamond', hasDiamondTrophy);
 
-      // Check Bumper Claim Requirements & Trophy Consumption Availability
       const claimBtn = document.getElementById('claimBumperBtn');
       const badge = document.getElementById('bumperClaimProgressBadge');
       const reqText = document.getElementById('bumperClaimRequirementText');
+      const inventoryCheckEl = document.getElementById('bumperTrophyInventoryCheck');
 
       if (badge) badge.textContent = `Claim ${bumperClaimCount} / 5`;
 
       let canClaim = false;
       let reqDescription = '';
+      let inventoryBadgesHTML = '';
 
       if (bumperClaimCount >= 5) {
         reqDescription = 'All 5 Grand Bumpers claimed! Maximum bonus level achieved.';
@@ -2417,15 +2433,49 @@
       } else if (bumperClaimCount === 0 || bumperClaimCount === 1) {
         reqDescription = 'Next Claim consumes: 1 Bronze + 1 Silver Trophy.';
         canClaim = bronzeTrophies >= 1 && silverTrophies >= 1;
+        inventoryBadgesHTML = `
+          <span class="px-2 py-0.5 rounded ${bronzeTrophies >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            Bronze: ${bronzeTrophies}/1
+          </span>
+          <span class="px-2 py-0.5 rounded ${silverTrophies >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            Silver: ${silverTrophies}/1
+          </span>
+        `;
       } else if (bumperClaimCount === 2 || bumperClaimCount === 3) {
         reqDescription = 'Next Claim consumes: 1 Bronze + 1 Silver + 1 Golden Trophy.';
         canClaim = bronzeTrophies >= 1 && silverTrophies >= 1 && goldenTrophies >= 1;
+        inventoryBadgesHTML = `
+          <span class="px-2 py-0.5 rounded ${bronzeTrophies >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            Bronze: ${bronzeTrophies}/1
+          </span>
+          <span class="px-2 py-0.5 rounded ${silverTrophies >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            Silver: ${silverTrophies}/1
+          </span>
+          <span class="px-2 py-0.5 rounded ${goldenTrophies >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            Golden: ${goldenTrophies}/1
+          </span>
+        `;
       } else if (bumperClaimCount === 4) {
         reqDescription = 'Ultimate Claim 5 consumes: 1 Bronze + 1 Silver + 1 Golden (Requires Diamond Trophy unlocked).';
         canClaim = bronzeTrophies >= 1 && silverTrophies >= 1 && goldenTrophies >= 1 && hasDiamondTrophy;
+        inventoryBadgesHTML = `
+          <span class="px-2 py-0.5 rounded ${bronzeTrophies >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            Bronze: ${bronzeTrophies}/1
+          </span>
+          <span class="px-2 py-0.5 rounded ${silverTrophies >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            Silver: ${silverTrophies}/1
+          </span>
+          <span class="px-2 py-0.5 rounded ${goldenTrophies >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            Golden: ${goldenTrophies}/1
+          </span>
+          <span class="px-2 py-0.5 rounded ${hasDiamondTrophy ? 'bg-cyan-100 text-cyan-800' : 'bg-rose-100 text-rose-800'}">
+            Diamond: ${hasDiamondTrophy ? 'Unlocked' : 'Locked'}
+          </span>
+        `;
       }
 
       if (reqText) reqText.textContent = reqDescription;
+      if (inventoryCheckEl) inventoryCheckEl.innerHTML = inventoryBadgesHTML;
 
       if (claimBtn) {
         if (canClaim && bumperClaimCount < 5) {
@@ -2438,7 +2488,6 @@
       }
     }
 
-    // Strictly consumes/deducts 1 of each required trophy upon claiming the +100 point bumper
     function claimGrandBumperReward() {
       if (bumperClaimCount >= 5) return;
 
@@ -2465,7 +2514,6 @@
         bronzeTrophies -= 1;
         silverTrophies -= 1;
         goldenTrophies -= 1;
-        // Diamond Trophy is permanent/lifetime and not deducted
       }
 
       bumperClaimCount++;
@@ -2584,17 +2632,20 @@
     }
 
     // ----------------------------------------------------
-    // Robust Dual-Sheet Engine with Timeout Safety
+    // Robust Cloud-Authoritative Dual-Sheet Engine
     // ----------------------------------------------------
     async function syncWithSpreadsheet() {
       if (!accessToken) return;
       try {
         const sheetId = await ensureSpreadsheetExists();
         if (sheetId) {
+          // Strictly fetch cloud state FIRST before allowing any state pushing
           await pullStateFromSpreadsheet();
-          await syncStateToSpreadsheet();
+          isCloudHydrated = true;
         }
-      } catch(e) {}
+      } catch(e) {
+        isCloudHydrated = true; // Fallback to avoid complete lock
+      }
     }
 
     async function ensureSpreadsheetExists() {
@@ -2622,12 +2673,7 @@
         const data = await searchRes.json();
         const files = data.files || [];
 
-        if (files.length === 1) {
-          sheetId = files[0].id;
-          localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
-          await ensureSheet2TabExists(sheetId);
-          return sheetId;
-        } else if (files.length > 1) {
+        if (files.length >= 1) {
           sheetId = files[0].id;
           localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
           await ensureSheet2TabExists(sheetId);
@@ -2659,6 +2705,7 @@
           body: JSON.stringify({ values: headers })
         });
 
+        isCloudHydrated = true;
         await syncStateToSpreadsheet();
         return sheetId;
       } catch(e) {
@@ -2687,13 +2734,14 @@
       } catch(e) {}
     }
 
+    // Strictly reads Sheet 2 and updates the local state without overwriting the cloud
     async function pullStateFromSpreadsheet() {
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
       if (!accessToken || !sheetId) return;
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
         const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1`, {
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -2706,12 +2754,14 @@
           const cloudState = JSON.parse(data.values[0][0]);
           let stateChanged = false;
 
+          // Hydrate Tasks from cloud
           if (Array.isArray(cloudState.tasks)) {
             tasks = cloudState.tasks;
             localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
             stateChanged = true;
           }
 
+          // Hydrate Subscription
           if (cloudState.subscriptionExpiry !== undefined) {
             subscriptionExpiry = cloudState.subscriptionExpiry;
             localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
@@ -2719,6 +2769,7 @@
             enforceSubscriptionCheck();
           }
 
+          // Hydrate Rewards, Trophies & Themes
           if (cloudState.rewards) {
             userPoints = Number(cloudState.rewards.userPoints) || 0;
             awardedHourlyPoints = Number(cloudState.rewards.awardedHourlyPoints) || 0;
@@ -2738,7 +2789,25 @@
             activeTheme = cloudState.rewards.activeTheme || 'default';
             customDriveWallpaperUrl = cloudState.rewards.customDriveWallpaperUrl || '';
 
-            saveRewardsState();
+            const localPayload = {
+              userPoints,
+              awardedHourlyPoints,
+              bronzeTrophies,
+              silverTrophies,
+              goldenTrophies,
+              hasDiamondTrophy,
+              todayMilestonesAchieved,
+              streakCount,
+              lastStreakDate,
+              bumperClaimCount,
+              unlockedThemes,
+              activeTheme,
+              customDriveWallpaperUrl
+            };
+            localStorage.setItem(STORAGE_KEY_REWARDS, JSON.stringify(localPayload));
+
+            updatePointsDisplay();
+            updateTrophiesUI();
             applyActiveThemeUI();
             updateShopThemesUI();
           }
@@ -2753,7 +2822,8 @@
 
     async function syncStateToSpreadsheet() {
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
-      if (!accessToken || !sheetId || isStateSyncing) return;
+      // Strictly prevent pushing if we haven't fetched the cloud source of truth yet
+      if (!accessToken || !sheetId || isStateSyncing || !isCloudHydrated) return;
       isStateSyncing = true;
 
       try {
@@ -2838,7 +2908,7 @@
         clearTimeout(timeoutId);
       } catch(e) {
       } finally {
-        syncStateToSpreadsheet();
+        if (isCloudHydrated) syncStateToSpreadsheet();
       }
     }
 

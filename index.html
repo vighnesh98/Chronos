@@ -174,8 +174,8 @@
       <div class="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center text-2xl shadow-xs mb-3">
         <i class="fa-solid fa-arrows-rotate fa-spin"></i>
       </div>
-      <h3 class="text-sm font-black text-slate-900">Synchronizing with Cloud</h3>
-      <p id="cloudSyncStatusText" class="text-xs text-slate-500 mt-1">Connecting to Google Sheets and fetching your latest focus records...</p>
+      <h3 class="text-sm font-black text-slate-900">Synchronizing from Sheets</h3>
+      <p id="cloudSyncStatusText" class="text-xs text-slate-500 mt-1">Reading organized App_State from Google Sheets...</p>
     </div>
   </div>
 
@@ -330,7 +330,7 @@
       </div>
 
       <div class="pt-4 border-t border-slate-100 text-center">
-        <p class="text-[11px] font-medium text-slate-400">Chronos v3.2 &bull; True Cloud Persistence</p>
+        <p class="text-[11px] font-medium text-slate-400">Chronos v3.3 &bull; Organized Sheet 2 Table</p>
       </div>
     </aside>
 
@@ -392,7 +392,7 @@
 
     <!-- Bottom Notice -->
     <footer class="mt-8 text-center text-slate-400 text-[11px] py-2">
-      Chronos Focus &bull; Sheet 1 Activity Logs &bull; Sheet 2 App State &bull; Cloud Authoritative
+      Chronos Focus &bull; Sheet 1: Task_Logs &bull; Sheet 2: App_State Table &bull; Cloud Authoritative
     </footer>
 
   </div>
@@ -649,7 +649,6 @@
               Next Claim consumes: <strong class="text-slate-900">1 Bronze + 1 Silver Trophy</strong>.
             </p>
             <div id="bumperTrophyInventoryCheck" class="flex flex-wrap gap-2 mt-2 text-[11px] font-bold">
-              <!-- Dynamically populated inventory indicators -->
             </div>
           </div>
 
@@ -908,7 +907,7 @@
   <!-- Mandatory Undismissable Subscription Expired Blocker Modal -->
   <div id="expiredSubscriptionGate" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 hidden">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
-      <div class="w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 mx-auto flex items-center justify-center text-3xl shadow-sm mb-4">
+      <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 mx-auto flex items-center justify-center text-3xl shadow-sm mb-4">
         <i class="fa-solid fa-hourglass-end"></i>
       </div>
       <h3 class="text-lg font-black text-slate-900">Subscription Required</h3>
@@ -1131,9 +1130,10 @@
     let lastAnalyticsFetchTime = 0;
     let dashboardPollingInterval = null;
 
-    // Fail-safe mutexes & Hydration protection
+    // Fail-safe mutexes & Hydration protection:
+    // isCloudHydrated is strictly FALSE until pullStateFromSpreadsheet finishes reading
     let isStateSyncing = false;
-    let isCloudHydrated = false; // Strictly blocks local overwrite before cloud fetch completes
+    let isCloudHydrated = false; 
     let periodicSyncInterval = null;
     let lastActiveTaskTimestamp = Date.now();
     let lastInactivityAlertTimestamp = 0;
@@ -1307,11 +1307,11 @@
     // App Initialization
     // ----------------------------------------------------
     window.addEventListener('load', async () => {
+      // 1. Load initial local storage strictly for instantaneous UI preview
       loadSettingsInputs();
       loadSubscription();
       loadTasks();
       loadRewardsState();
-      checkMidnightReset();
       initAuthSession();
       renderTasks();
       updateHeroMetrics();
@@ -1321,6 +1321,8 @@
       updateShopThemesUI();
       requestNotificationPermission();
 
+      // 2. If authenticated, Google Sheets is the ONLY source of truth.
+      // Show loader, pull the organized table, then unlock writes.
       if (accessToken) {
         showSyncLoader();
         await syncWithSpreadsheet();
@@ -1328,6 +1330,9 @@
       } else {
         hideSyncLoader();
       }
+
+      // Check midnight after cloud hydration completes
+      checkMidnightReset();
 
       setInterval(() => {
         tickTimers();
@@ -1424,7 +1429,7 @@
       if (!accessToken) {
         requestGoogleToken();
       } else {
-        isCloudHydrated = false; // Trigger safe re-fetch
+        isCloudHydrated = false;
         syncWithSpreadsheet();
       }
     }
@@ -1437,11 +1442,11 @@
       if (!Array.isArray(tasks)) tasks = [];
     }
 
-    function saveTasks() {
+    function saveTasks(skipOutboundSync = false) {
       localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
       renderTasks();
       updateHeroMetrics();
-      if (isCloudHydrated) {
+      if (!skipOutboundSync && isCloudHydrated) {
         syncStateToSpreadsheet();
       }
     }
@@ -1573,12 +1578,12 @@
       if (saved) subscriptionExpiry = parseInt(saved, 10) || 0;
     }
 
-    function saveSubscription(expiryTime) {
+    function saveSubscription(expiryTime, skipOutboundSync = false) {
       subscriptionExpiry = expiryTime;
       localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, expiryTime.toString());
       updateSubscriptionTicker();
       enforceSubscriptionCheck();
-      if (isCloudHydrated) syncStateToSpreadsheet();
+      if (!skipOutboundSync && isCloudHydrated) syncStateToSpreadsheet();
     }
 
     function isSubscriptionActive() {
@@ -1745,7 +1750,6 @@
           t.lastStarted = null;
         });
 
-        // Reset today's milestone flags so fresh trophies can be earned today
         todayMilestonesAchieved = { bronze: false, silver: false, golden: false };
         awardedHourlyPoints = 0;
 
@@ -2124,9 +2128,9 @@
           userPoints = Number(r.userPoints) || 0;
           awardedHourlyPoints = Number(r.awardedHourlyPoints) || 0;
           
-          bronzeTrophies = Number(r.bronzeTrophies !== undefined ? r.bronzeTrophies : (r.dailyTrophies && r.dailyTrophies.bronze ? 1 : 0)) || 0;
-          silverTrophies = Number(r.silverTrophies !== undefined ? r.silverTrophies : (r.dailyTrophies && r.dailyTrophies.silver ? 1 : 0)) || 0;
-          goldenTrophies = Number(r.goldenTrophies !== undefined ? r.goldenTrophies : (r.dailyTrophies && r.dailyTrophies.golden ? 1 : 0)) || 0;
+          bronzeTrophies = Number(r.bronzeTrophies !== undefined ? r.bronzeTrophies : 0);
+          silverTrophies = Number(r.silverTrophies !== undefined ? r.silverTrophies : 0);
+          goldenTrophies = Number(r.goldenTrophies !== undefined ? r.goldenTrophies : 0);
           hasDiamondTrophy = !!r.hasDiamondTrophy;
 
           todayMilestonesAchieved = r.todayMilestonesAchieved || { bronze: false, silver: false, golden: false };
@@ -2142,7 +2146,7 @@
       }
     }
 
-    function saveRewardsState() {
+    function saveRewardsState(skipOutboundSync = false) {
       const payload = {
         userPoints,
         awardedHourlyPoints,
@@ -2159,7 +2163,7 @@
         customDriveWallpaperUrl
       };
       localStorage.setItem(STORAGE_KEY_REWARDS, JSON.stringify(payload));
-      if (isCloudHydrated) syncStateToSpreadsheet();
+      if (!skipOutboundSync && isCloudHydrated) syncStateToSpreadsheet();
       updatePointsDisplay();
       updateTrophiesUI();
       updateShopThemesUI();
@@ -2229,7 +2233,6 @@
     }
 
     function updateShopThemesUI() {
-      // Midnight Slate Button
       const btnMid = document.getElementById('themeBtnMidnight');
       const priceMid = document.getElementById('themePriceMidnight');
       if (btnMid && priceMid) {
@@ -2248,7 +2251,6 @@
         }
       }
 
-      // Emerald Forest Button
       const btnEm = document.getElementById('themeBtnEmerald');
       const priceEm = document.getElementById('themePriceEmerald');
       if (btnEm && priceEm) {
@@ -2267,7 +2269,6 @@
         }
       }
 
-      // Custom Drive Button
       const btnCust = document.getElementById('themeBtnCustom');
       const priceCust = document.getElementById('themePriceCustom');
       if (btnCust && priceCust) {
@@ -2342,7 +2343,6 @@
 
     function applyActiveThemeUI() {
       const wallpaperEl = document.getElementById('customWallpaperBg');
-      
       document.body.classList.remove('theme-midnight', 'theme-emerald');
 
       if (activeTheme === 'custom_drive' && customDriveWallpaperUrl) {
@@ -2632,19 +2632,20 @@
     }
 
     // ----------------------------------------------------
-    // Robust Cloud-Authoritative Dual-Sheet Engine
+    // Organized Sheet 2 Table Cloud Engine (Read-Authoritative)
     // ----------------------------------------------------
     async function syncWithSpreadsheet() {
       if (!accessToken) return;
       try {
         const sheetId = await ensureSpreadsheetExists();
         if (sheetId) {
-          // Strictly fetch cloud state FIRST before allowing any state pushing
+          // Strictly read and hydrate from Sheet 2 FIRST
           await pullStateFromSpreadsheet();
+          // Now mark cloud hydrated so future explicit user actions can sync
           isCloudHydrated = true;
         }
       } catch(e) {
-        isCloudHydrated = true; // Fallback to avoid complete lock
+        isCloudHydrated = true;
       }
     }
 
@@ -2698,6 +2699,7 @@
         sheetId = created.spreadsheetId;
         localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
 
+        // Header for Sheet 1
         const headers = [['Timestamp', 'Date', 'ISO_Week', 'Month', 'Task_Name', 'Event', 'Duration_Mins']];
         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A1:G1:append?valueInputOption=USER_ENTERED`, {
           method: 'POST',
@@ -2734,7 +2736,7 @@
       } catch(e) {}
     }
 
-    // Strictly reads Sheet 2 and updates the local state without overwriting the cloud
+    // STRICT INBOUND READ: Reads the key-value table from Sheet 2 (App_State)
     async function pullStateFromSpreadsheet() {
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
       if (!accessToken || !sheetId) return;
@@ -2743,119 +2745,175 @@
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-        const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1`, {
+        // Fetch the full organized range A1:B20 from App_State
+        const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B20`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           signal: controller.signal
         });
         clearTimeout(timeoutId);
 
         const data = await res.json();
-        if (data.values && data.values[0] && data.values[0][0]) {
-          const cloudState = JSON.parse(data.values[0][0]);
-          let stateChanged = false;
+        const rows = data.values || [];
+        if (!rows.length) return;
 
-          // Hydrate Tasks from cloud
-          if (Array.isArray(cloudState.tasks)) {
-            tasks = cloudState.tasks;
-            localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
-            stateChanged = true;
-          }
-
-          // Hydrate Subscription
-          if (cloudState.subscriptionExpiry !== undefined) {
-            subscriptionExpiry = cloudState.subscriptionExpiry;
-            localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
-            updateSubscriptionTicker();
-            enforceSubscriptionCheck();
-          }
-
-          // Hydrate Rewards, Trophies & Themes
-          if (cloudState.rewards) {
-            userPoints = Number(cloudState.rewards.userPoints) || 0;
-            awardedHourlyPoints = Number(cloudState.rewards.awardedHourlyPoints) || 0;
-            
-            bronzeTrophies = Number(cloudState.rewards.bronzeTrophies !== undefined ? cloudState.rewards.bronzeTrophies : (cloudState.rewards.dailyTrophies && cloudState.rewards.dailyTrophies.bronze ? 1 : 0)) || 0;
-            silverTrophies = Number(cloudState.rewards.silverTrophies !== undefined ? cloudState.rewards.silverTrophies : (cloudState.rewards.dailyTrophies && cloudState.rewards.dailyTrophies.silver ? 1 : 0)) || 0;
-            goldenTrophies = Number(cloudState.rewards.goldenTrophies !== undefined ? cloudState.rewards.goldenTrophies : (cloudState.rewards.dailyTrophies && cloudState.rewards.dailyTrophies.golden ? 1 : 0)) || 0;
-            hasDiamondTrophy = !!cloudState.rewards.hasDiamondTrophy;
-
-            todayMilestonesAchieved = cloudState.rewards.todayMilestonesAchieved || { bronze: false, silver: false, golden: false };
-
-            streakCount = Number(cloudState.rewards.streakCount) || 0;
-            lastStreakDate = cloudState.rewards.lastStreakDate || '';
-            bumperClaimCount = Number(cloudState.rewards.bumperClaimCount) || 0;
-            
-            unlockedThemes = Array.isArray(cloudState.rewards.unlockedThemes) ? cloudState.rewards.unlockedThemes : ['default'];
-            activeTheme = cloudState.rewards.activeTheme || 'default';
-            customDriveWallpaperUrl = cloudState.rewards.customDriveWallpaperUrl || '';
-
-            const localPayload = {
-              userPoints,
-              awardedHourlyPoints,
-              bronzeTrophies,
-              silverTrophies,
-              goldenTrophies,
-              hasDiamondTrophy,
-              todayMilestonesAchieved,
-              streakCount,
-              lastStreakDate,
-              bumperClaimCount,
-              unlockedThemes,
-              activeTheme,
-              customDriveWallpaperUrl
-            };
-            localStorage.setItem(STORAGE_KEY_REWARDS, JSON.stringify(localPayload));
-
-            updatePointsDisplay();
-            updateTrophiesUI();
-            applyActiveThemeUI();
-            updateShopThemesUI();
-          }
-
-          if (stateChanged) {
-            renderTasks();
-            updateHeroMetrics();
-          }
+        // Check if Sheet 2 still has legacy single-cell JSON in A1
+        if (rows[0] && rows[0][0] && rows[0][0].trim().startsWith('{')) {
+          try {
+            const legacyState = JSON.parse(rows[0][0]);
+            applyCloudStateObject(legacyState);
+            return;
+          } catch(e) {}
         }
+
+        // Convert the clean 2-column key-value rows into a dictionary
+        const tableMap = {};
+        rows.forEach(r => {
+          if (r[0] !== undefined) {
+            const key = String(r[0]).trim();
+            const val = r[1] !== undefined ? String(r[1]).trim() : '';
+            tableMap[key] = val;
+          }
+        });
+
+        // 1. Points (Directly adopts userPoints - e.g. 1000 from cell B2)
+        if (tableMap['User_Points'] !== undefined && tableMap['User_Points'] !== '') {
+          userPoints = Number(tableMap['User_Points']) || 0;
+        }
+
+        // 2. Subscription Expiry
+        if (tableMap['Subscription_Expiry_Ms'] !== undefined && tableMap['Subscription_Expiry_Ms'] !== '') {
+          subscriptionExpiry = Number(tableMap['Subscription_Expiry_Ms']) || 0;
+          localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
+          updateSubscriptionTicker();
+          enforceSubscriptionCheck();
+        }
+
+        // 3. Trophies Inventory
+        if (tableMap['Bronze_Trophies'] !== undefined) bronzeTrophies = Number(tableMap['Bronze_Trophies']) || 0;
+        if (tableMap['Silver_Trophies'] !== undefined) silverTrophies = Number(tableMap['Silver_Trophies']) || 0;
+        if (tableMap['Golden_Trophies'] !== undefined) goldenTrophies = Number(tableMap['Golden_Trophies']) || 0;
+        if (tableMap['Diamond_Trophy'] !== undefined) hasDiamondTrophy = (tableMap['Diamond_Trophy'].toUpperCase() === 'TRUE');
+
+        // 4. Streak & Bumpers
+        if (tableMap['Streak_Days'] !== undefined) streakCount = Number(tableMap['Streak_Days']) || 0;
+        if (tableMap['Bumper_Claims'] !== undefined) bumperClaimCount = Number(tableMap['Bumper_Claims']) || 0;
+
+        // 5. Themes & Wallpapers
+        if (tableMap['Active_Theme']) activeTheme = tableMap['Active_Theme'];
+        if (tableMap['Custom_Wallpaper_Url']) customDriveWallpaperUrl = tableMap['Custom_Wallpaper_Url'];
+        if (tableMap['Unlocked_Themes']) {
+          unlockedThemes = tableMap['Unlocked_Themes'].split(',').map(s => s.trim()).filter(Boolean);
+          if (!unlockedThemes.includes('default')) unlockedThemes.unshift('default');
+        }
+
+        // 6. Tasks
+        if (tableMap['Tasks_State_JSON']) {
+          try {
+            const parsedTasks = JSON.parse(tableMap['Tasks_State_JSON']);
+            if (Array.isArray(parsedTasks)) {
+              tasks = parsedTasks;
+              localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+            }
+          } catch(e) {}
+        }
+
+        // Save cleanly to local storage WITHOUT triggering an outbound write to the spreadsheet
+        const localPayload = {
+          userPoints,
+          awardedHourlyPoints,
+          bronzeTrophies,
+          silverTrophies,
+          goldenTrophies,
+          hasDiamondTrophy,
+          todayMilestonesAchieved,
+          streakCount,
+          lastStreakDate,
+          bumperClaimCount,
+          unlockedThemes,
+          activeTheme,
+          customDriveWallpaperUrl
+        };
+        localStorage.setItem(STORAGE_KEY_REWARDS, JSON.stringify(localPayload));
+
+        // Immediately update all UI displays with the fresh cloud data
+        renderTasks();
+        updateHeroMetrics();
+        updatePointsDisplay();
+        updateTrophiesUI();
+        applyActiveThemeUI();
+        updateShopThemesUI();
+
       } catch(e) {}
     }
 
+    function applyCloudStateObject(cloudState) {
+      if (Array.isArray(cloudState.tasks)) {
+        tasks = cloudState.tasks;
+        localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+      }
+      if (cloudState.subscriptionExpiry !== undefined) {
+        subscriptionExpiry = cloudState.subscriptionExpiry;
+        localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
+        updateSubscriptionTicker();
+        enforceSubscriptionCheck();
+      }
+      if (cloudState.rewards) {
+        userPoints = Number(cloudState.rewards.userPoints) || 0;
+        awardedHourlyPoints = Number(cloudState.rewards.awardedHourlyPoints) || 0;
+        bronzeTrophies = Number(cloudState.rewards.bronzeTrophies) || 0;
+        silverTrophies = Number(cloudState.rewards.silverTrophies) || 0;
+        goldenTrophies = Number(cloudState.rewards.goldenTrophies) || 0;
+        hasDiamondTrophy = !!cloudState.rewards.hasDiamondTrophy;
+        todayMilestonesAchieved = cloudState.rewards.todayMilestonesAchieved || { bronze: false, silver: false, golden: false };
+        streakCount = Number(cloudState.rewards.streakCount) || 0;
+        lastStreakDate = cloudState.rewards.lastStreakDate || '';
+        bumperClaimCount = Number(cloudState.rewards.bumperClaimCount) || 0;
+        unlockedThemes = Array.isArray(cloudState.rewards.unlockedThemes) ? cloudState.rewards.unlockedThemes : ['default'];
+        activeTheme = cloudState.rewards.activeTheme || 'default';
+        customDriveWallpaperUrl = cloudState.rewards.customDriveWallpaperUrl || '';
+
+        saveRewardsState(true); // skip outbound write
+      }
+      renderTasks();
+      updateHeroMetrics();
+      updatePointsDisplay();
+      updateTrophiesUI();
+      applyActiveThemeUI();
+      updateShopThemesUI();
+    }
+
+    // STRICT OUTBOUND WRITE: Writes an organized, human-readable table into Sheet 2 (App_State)
     async function syncStateToSpreadsheet() {
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
-      // Strictly prevent pushing if we haven't fetched the cloud source of truth yet
       if (!accessToken || !sheetId || isStateSyncing || !isCloudHydrated) return;
       isStateSyncing = true;
 
       try {
-        const statePayload = {
-          updatedAt: new Date().toISOString(),
-          subscriptionExpiry: subscriptionExpiry,
-          tasks: tasks,
-          rewards: {
-            userPoints,
-            awardedHourlyPoints,
-            bronzeTrophies,
-            silverTrophies,
-            goldenTrophies,
-            hasDiamondTrophy,
-            todayMilestonesAchieved,
-            streakCount,
-            lastStreakDate,
-            bumperClaimCount,
-            unlockedThemes,
-            activeTheme,
-            customDriveWallpaperUrl
-          }
-        };
+        // Organized 2-Column Ledger
+        const organizedTableRows = [
+          ['Setting / Metric', 'Value / Configuration'],
+          ['User_Points', userPoints],
+          ['Subscription_Expiry_Ms', subscriptionExpiry],
+          ['Bronze_Trophies', bronzeTrophies],
+          ['Silver_Trophies', silverTrophies],
+          ['Golden_Trophies', goldenTrophies],
+          ['Diamond_Trophy', hasDiamondTrophy ? 'TRUE' : 'FALSE'],
+          ['Streak_Days', streakCount],
+          ['Bumper_Claims', bumperClaimCount],
+          ['Active_Theme', activeTheme],
+          ['Custom_Wallpaper_Url', customDriveWallpaperUrl || ''],
+          ['Unlocked_Themes', unlockedThemes.join(', ')],
+          ['Tasks_State_JSON', JSON.stringify(tasks)],
+          ['Last_Cloud_Sync', new Date().toISOString()]
+        ];
 
-        const jsonString = JSON.stringify(statePayload);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 7000);
 
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1?valueInputOption=RAW`, {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B14?valueInputOption=USER_ENTERED`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [[jsonString]] }),
+          body: JSON.stringify({ values: organizedTableRows }),
           signal: controller.signal
         });
         clearTimeout(timeoutId);

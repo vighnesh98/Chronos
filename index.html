@@ -834,14 +834,7 @@
         <span>Google Spreadsheet URL or ID (Optional)</span>
         <span class="text-[9px] text-slate-400 font-normal">Auto-detected if empty</span>
       </label>
-      <input type="text" id="sheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/... or ID" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-3" />
-
-      <!-- Manual Google Drive JSON Link / ID -->
-      <label class="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center justify-between">
-        <span>Drive JSON File URL or ID (Optional)</span>
-        <span class="text-[9px] text-slate-400 font-normal">Auto-detected if empty</span>
-      </label>
-      <input type="text" id="jsonUrlInput" placeholder="https://drive.google.com/file/d/... or ID" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-4" />
+      <input type="text" id="sheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/... or ID" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-4" />
 
       <div class="flex justify-end gap-2">
         <button onclick="closeSettingsModal()" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">Cancel</button>
@@ -864,7 +857,6 @@
     const STORAGE_KEY_TASKS = 'chronos_tasks_state';
     const STORAGE_KEY_CLIENT_ID = 'chronos_client_id';
     const STORAGE_KEY_SHEET_ID = 'chronos_sheet_id';
-    const STORAGE_KEY_DRIVE_FILE_ID = 'chronos_drive_file_id';
     const STORAGE_KEY_SUBSCRIPTION = 'chronos_subscription_state';
 
     const PLAN_SECRET_CODE = '@@112267';
@@ -888,7 +880,7 @@
     let dashboardPollingInterval = null;
 
     let celebratedMilestones = new Set();
-    let isSyncingToDrive = false;
+    let isSyncingState = false;
     let isAppendingSheetRow = false;
     let periodicSyncInterval = null;
     let lastActiveTaskTimestamp = Date.now();
@@ -1166,9 +1158,6 @@
 
       const savedSheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
       if (savedSheetId) document.getElementById('sheetUrlInput').value = savedSheetId;
-
-      const savedJsonId = localStorage.getItem(STORAGE_KEY_DRIVE_FILE_ID);
-      if (savedJsonId) document.getElementById('jsonUrlInput').value = savedJsonId;
     }
 
     function getClientId() {
@@ -1180,21 +1169,12 @@
       localStorage.setItem(STORAGE_KEY_CLIENT_ID, cid);
 
       const rawSheet = document.getElementById('sheetUrlInput').value.trim();
-      const rawJson = document.getElementById('jsonUrlInput').value.trim();
-
       const parsedSheetId = extractGoogleFileId(rawSheet);
-      const parsedJsonId = extractGoogleFileId(rawJson);
 
       if (parsedSheetId) {
         localStorage.setItem(STORAGE_KEY_SHEET_ID, parsedSheetId);
       } else {
         localStorage.removeItem(STORAGE_KEY_SHEET_ID);
-      }
-
-      if (parsedJsonId) {
-        localStorage.setItem(STORAGE_KEY_DRIVE_FILE_ID, parsedJsonId);
-      } else {
-        localStorage.removeItem(STORAGE_KEY_DRIVE_FILE_ID);
       }
 
       closeSettingsModal();
@@ -1203,7 +1183,7 @@
       if (!accessToken) {
         requestGoogleToken();
       } else {
-        syncWithDriveAndSheets();
+        syncWithSpreadsheet();
       }
     }
 
@@ -1223,7 +1203,7 @@
       localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
       renderTasks();
       updateHeroMetrics();
-      syncToDrive();
+      syncStateToSpreadsheet();
     }
 
     // ----------------------------------------------------
@@ -1314,7 +1294,7 @@
 
             updateAuthUI(true);
             showToast('Signed in successfully');
-            syncWithDriveAndSheets();
+            syncWithSpreadsheet();
           } else {
             showToast('Sign-in cancelled or failed');
           }
@@ -1358,7 +1338,7 @@
       localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, expiryTime.toString());
       updateSubscriptionTicker();
       enforceSubscriptionCheck();
-      syncToDrive();
+      syncStateToSpreadsheet();
     }
 
     function isSubscriptionActive() {
@@ -1530,6 +1510,55 @@
 
       document.getElementById('heroResetCountdown').textContent =
         `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // ----------------------------------------------------
+    // Guaranteed 1-Minute Periodic Sheets Sync
+    // ----------------------------------------------------
+    function startPeriodicSheetSync() {
+      if (periodicSyncInterval) clearInterval(periodicSyncInterval);
+      periodicSyncInterval = setInterval(async () => {
+        if (!accessToken || !isSubscriptionActive()) return;
+
+        const now = Date.now();
+        // Check for running task: log periodic checkpoint progress
+        for (const task of tasks) {
+          if (task.isRunning && task.lastStarted) {
+            const currentSeconds = (now - task.lastStarted) / 1000;
+            // Only log if active for at least 15 seconds
+            if (currentSeconds >= 15) {
+              const minutes = (currentSeconds / 60).toFixed(2);
+              task.elapsed += currentSeconds;
+              task.lastStarted = now; // reset session start anchor
+              saveTasks();
+              await logTaskEventToSheets(task.title, 'Active-Checkpoint', minutes);
+            }
+          }
+        }
+
+        // Pull and push latest unified state to Sheet 2 (App_State)
+        pullStateFromSpreadsheet();
+        syncStateToSpreadsheet();
+      }, 60000); // exactly every 60 seconds
+    }
+
+    // PWA Install Prompt Listener
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('pwaInstallBtn');
+      if (btn) btn.classList.remove('hidden');
+    });
+
+    function promptPWAInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(() => {
+          deferredPrompt = null;
+        });
+      } else {
+        showToast('To install, tap your browser menu (⋮) and select "Install app"');
+      }
     }
 
     // ----------------------------------------------------
@@ -1906,161 +1935,18 @@
     }
 
     // ----------------------------------------------------
-    // Unified Multi-Device Drive & Sheets Discovery Engine (Safe Continuity - No Overwrites)
+    // Unified Google Spreadsheet Discovery & Dual-Sheet Sync Engine
+    // (Sheet 1 = Task_Logs, Sheet 2 = App_State)
     // ----------------------------------------------------
-    async function syncWithDriveAndSheets() {
+    async function syncWithSpreadsheet() {
       if (!accessToken) return;
       try {
-        await resolveDriveJsonFile();
-        await ensureSpreadsheetExists();
-        syncToDrive();
-      } catch (e) {}
-    }
-
-    async function resolveDriveJsonFile() {
-      if (!accessToken) return null;
-      let driveFileId = localStorage.getItem(STORAGE_KEY_DRIVE_FILE_ID);
-
-      // 1. Verify manually assigned or cached JSON file ID if present
-      if (driveFileId) {
-        try {
-          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=id,trashed`, {
-            headers: { Authorization: `Bearer ${accessToken}` }
-          });
-          const meta = await res.json();
-          if (meta && !meta.trashed && meta.id) {
-            await pullDataFromDriveJson(meta.id);
-            return meta.id;
-          } else {
-            // Dead or trashed link: remove outdated link
-            localStorage.removeItem(STORAGE_KEY_DRIVE_FILE_ID);
-          }
-        } catch (e) {}
-      }
-
-      // 2. Query Drive for existing non-trashed chronos_task_data.json
-      try {
-        const query = encodeURIComponent("name = 'chronos_task_data.json' and trashed = false");
-        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed,modifiedTime)&orderBy=modifiedTime desc`, {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        const data = await searchRes.json();
-        if (data.files && data.files.length > 0) {
-          driveFileId = data.files[0].id;
-          localStorage.setItem(STORAGE_KEY_DRIVE_FILE_ID, driveFileId);
-          // Always adopt existing data from cloud JSON without erasing
-          await pullDataFromDriveJson(driveFileId);
-          return driveFileId;
+        const sheetId = await ensureSpreadsheetExists();
+        if (sheetId) {
+          await pullStateFromSpreadsheet();
+          await syncStateToSpreadsheet();
         }
       } catch (e) {}
-
-      // 3. Create fresh chronos_task_data.json in Drive only if no file exists
-      try {
-        const meta = { name: 'chronos_task_data.json', mimeType: 'application/json' };
-        const payload = JSON.stringify({
-          updatedAt: new Date().toISOString(),
-          subscriptionExpiry: subscriptionExpiry,
-          spreadsheetId: localStorage.getItem(STORAGE_KEY_SHEET_ID) || null,
-          tasks: tasks
-        });
-
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-        form.append('file', new Blob([payload], { type: 'application/json' }));
-
-        const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: form
-        });
-        const created = await createRes.json();
-        if (created && created.id) {
-          driveFileId = created.id;
-          localStorage.setItem(STORAGE_KEY_DRIVE_FILE_ID, driveFileId);
-          return driveFileId;
-        }
-      } catch (e) {}
-
-      return null;
-    }
-
-    async function pullDataFromDriveJson(fileId) {
-      if (!accessToken || !fileId) return;
-      try {
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        const data = await res.json();
-        if (!data) return;
-
-        let stateChanged = false;
-
-        // Adopt spreadsheet link from cloud JSON or update outdated one
-        if (data.spreadsheetId) {
-          const currentLocalSheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
-          if (currentLocalSheetId !== data.spreadsheetId) {
-            localStorage.setItem(STORAGE_KEY_SHEET_ID, data.spreadsheetId);
-          }
-        }
-
-        // Adopt subscription if cloud has higher validity
-        if (data.subscriptionExpiry && data.subscriptionExpiry > subscriptionExpiry) {
-          subscriptionExpiry = data.subscriptionExpiry;
-          localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
-          updateSubscriptionTicker();
-          enforceSubscriptionCheck();
-        }
-
-        // Safely adopt cloud tasks so home screen updates with the current JSON file
-        if (Array.isArray(data.tasks)) {
-          // Keep active running state if local was already running
-          const currentlyRunningId = tasks.find(t => t.isRunning)?.id;
-          tasks = data.tasks.map(t => {
-            if (t.id === currentlyRunningId) {
-              return { ...t, isRunning: true, lastStarted: Date.now() };
-            }
-            return { ...t, isRunning: false, lastStarted: null };
-          });
-          localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
-          stateChanged = true;
-        }
-
-        if (stateChanged) {
-          renderTasks();
-          updateHeroMetrics();
-        }
-      } catch (e) {}
-    }
-
-    // ----------------------------------------------------
-    // Google Sheets & Drive Cloud Sync
-    // ----------------------------------------------------
-    async function syncToDrive() {
-      if (!accessToken || isSyncingToDrive) return;
-      isSyncingToDrive = true;
-      try {
-        let driveFileId = localStorage.getItem(STORAGE_KEY_DRIVE_FILE_ID);
-        if (!driveFileId) {
-          driveFileId = await resolveDriveJsonFile();
-        }
-        if (!driveFileId) return;
-
-        const payloadContent = JSON.stringify({
-          updatedAt: new Date().toISOString(),
-          subscriptionExpiry: subscriptionExpiry,
-          spreadsheetId: localStorage.getItem(STORAGE_KEY_SHEET_ID) || null,
-          tasks: tasks
-        });
-
-        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: payloadContent
-        });
-      } catch (err) {
-      } finally {
-        isSyncingToDrive = false;
-      }
     }
 
     async function ensureSpreadsheetExists() {
@@ -2074,33 +1960,49 @@
             headers: { Authorization: `Bearer ${accessToken}` }
           });
           const meta = await res.json();
-          if (meta && !meta.trashed && meta.id) return sheetId;
+          if (meta && !meta.trashed && meta.id) {
+            await ensureAppSheetsExist(meta.id);
+            return meta.id;
+          }
           // Obsolete or trashed link: remove from storage
           localStorage.removeItem(STORAGE_KEY_SHEET_ID);
           sheetId = null;
         } catch(e) {}
       }
 
-      // Step 2: Search Drive for any non-trashed spreadsheet named 'Chronos Focus Logs'
+      // Step 2: Search Drive for spreadsheets named 'Chronos Focus Logs'
       try {
         const query = encodeURIComponent("name = 'Chronos Focus Logs' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
         const searchSheetRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed,modifiedTime)&orderBy=modifiedTime desc`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const sheetSearchResults = await searchSheetRes.json();
-        if (sheetSearchResults.files && sheetSearchResults.files.length > 0) {
-          sheetId = sheetSearchResults.files[0].id;
+        const found = sheetSearchResults.files || [];
+
+        if (found.length === 1) {
+          sheetId = found[0].id;
           localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
-          syncToDrive();
+          await ensureAppSheetsExist(sheetId);
+          return sheetId;
+        } else if (found.length > 1) {
+          // Multiple spreadsheets found: prompt user to provide the exact link in Settings
+          showToast('⚠️ Multiple spreadsheets found. Please paste the exact link in Settings.');
+          // Default to the most recently modified one while warning the user
+          sheetId = found[0].id;
+          localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
+          await ensureAppSheetsExist(sheetId);
           return sheetId;
         }
       } catch(e) {}
 
-      // Step 3: Only if no spreadsheet exists anywhere in Drive, create a new one
+      // Step 3: Zero spreadsheets exist in Drive -> Create new 2-sheet workbook
       try {
         const payload = {
           properties: { title: 'Chronos Focus Logs' },
-          sheets: [{ properties: { title: 'Task_Logs' } }]
+          sheets: [
+            { properties: { title: 'Task_Logs' } },
+            { properties: { title: 'App_State' } }
+          ]
         };
         const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
           method: 'POST',
@@ -2111,6 +2013,7 @@
         sheetId = created.spreadsheetId;
         localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
 
+        // Add headers to Sheet 1 (Task_Logs)
         const headers = [['Timestamp', 'Date', 'ISO_Week', 'Month', 'Task_Name', 'Event', 'Duration_Mins']];
         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A1:G1:append?valueInputOption=USER_ENTERED`, {
           method: 'POST',
@@ -2118,12 +2021,119 @@
           body: JSON.stringify({ values: headers })
         });
 
-        // Persist newly created sheetId into Drive JSON
-        syncToDrive();
+        // Initialize Sheet 2 (App_State)
+        const initialStatePayload = JSON.stringify({
+          updatedAt: new Date().toISOString(),
+          subscriptionExpiry: subscriptionExpiry,
+          tasks: tasks
+        });
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1?valueInputOption=RAW`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [[initialStatePayload]] })
+        });
 
         return sheetId;
       } catch(e) {
         return null;
+      }
+    }
+
+    // Verify both Task_Logs and App_State sheets exist in the spreadsheet
+    async function ensureAppSheetsExist(sheetId) {
+      if (!accessToken || !sheetId) return;
+      try {
+        const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties.title`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const data = await res.json();
+        const sheetTitles = (data.sheets || []).map(s => s.properties.title);
+
+        const requests = [];
+        if (!sheetTitles.includes('Task_Logs')) {
+          requests.push({ addSheet: { properties: { title: 'Task_Logs' } } });
+        }
+        if (!sheetTitles.includes('App_State')) {
+          requests.push({ addSheet: { properties: { title: 'App_State' } } });
+        }
+
+        if (requests.length > 0) {
+          await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests })
+          });
+        }
+      } catch(e) {}
+    }
+
+    // Sheet 2: Read App State (Replaces JSON File)
+    async function pullStateFromSpreadsheet() {
+      if (!accessToken) return;
+      const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
+      if (!sheetId) return;
+
+      try {
+        const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const data = await res.json();
+        const rawJson = data.values && data.values[0] ? data.values[0][0] : null;
+        if (!rawJson) return;
+
+        const stateData = JSON.parse(rawJson);
+        let stateChanged = false;
+
+        // Adopt subscription validity if cloud is more recent / higher
+        if (stateData.subscriptionExpiry && stateData.subscriptionExpiry > subscriptionExpiry) {
+          subscriptionExpiry = stateData.subscriptionExpiry;
+          localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
+          updateSubscriptionTicker();
+          enforceSubscriptionCheck();
+        }
+
+        // Adopt tasks from Sheet 2 without losing current active running timer on this device
+        if (Array.isArray(stateData.tasks) && stateData.tasks.length > 0) {
+          const runningTask = tasks.find(t => t.isRunning);
+          tasks = stateData.tasks.map(t => {
+            if (runningTask && t.id === runningTask.id) {
+              return { ...t, isRunning: true, lastStarted: runningTask.lastStarted };
+            }
+            return { ...t, isRunning: false, lastStarted: null };
+          });
+          localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+          stateChanged = true;
+        }
+
+        if (stateChanged) {
+          renderTasks();
+          updateHeroMetrics();
+        }
+      } catch(e) {}
+    }
+
+    // Sheet 2: Write App State (Replaces JSON File)
+    async function syncStateToSpreadsheet() {
+      if (!accessToken || isSyncingState) return;
+      const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
+      if (!sheetId) return;
+
+      isSyncingState = true;
+      try {
+        const payloadContent = JSON.stringify({
+          updatedAt: new Date().toISOString(),
+          subscriptionExpiry: subscriptionExpiry,
+          tasks: tasks
+        });
+
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1?valueInputOption=RAW`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [[payloadContent]] })
+        });
+      } catch (err) {
+      } finally {
+        isSyncingState = false;
       }
     }
 
@@ -2441,46 +2451,36 @@
       cachedAnalyticsRows = null;
       lastAnalyticsFetchTime = 0;
 
-      // 2. Wipe Google Drive JSON content while strictly preserving subscriptionExpiry and spreadsheetId
+      // 2. Wipe Google Spreadsheet Task_Logs (Sheet 1) & Reset App_State (Sheet 2)
       if (accessToken) {
-        try {
-          const searchRes = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=name='chronos_task_data.json'+and+trashed=false`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-          const searchData = await searchRes.json();
-          if (searchData.files && searchData.files.length > 0) {
-            const fileId = searchData.files[0].id;
-            const preservedPayload = JSON.stringify({
-              updatedAt: new Date().toISOString(),
-              subscriptionExpiry: subscriptionExpiry,
-              spreadsheetId: localStorage.getItem(STORAGE_KEY_SHEET_ID) || null,
-              tasks: []
-            });
-            await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-              method: 'PATCH',
-              headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-              body: preservedPayload
-            });
-          }
-        } catch(e) {}
-
-        // 3. Clear Google Spreadsheet Task_Logs content (preserve headers)
-        try {
-          const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
-          if (sheetId) {
+        const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
+        if (sheetId) {
+          try {
+            // Clear rows from Task_Logs (preserve headers A1:G1)
             await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A2:G:clear`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${accessToken}` }
             });
-          }
-        } catch(e) {}
+
+            // Reset App_State in Sheet 2 while preserving subscription
+            const clearedState = JSON.stringify({
+              updatedAt: new Date().toISOString(),
+              subscriptionExpiry: subscriptionExpiry,
+              tasks: []
+            });
+            await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1?valueInputOption=RAW`, {
+              method: 'PUT',
+              headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ values: [[clearedState]] })
+            });
+          } catch(e) {}
+        }
       }
 
       closeClearModal();
       showToast('Data wiped successfully! Reloading...');
 
-      // 4. Reload page to let fresh state take full effect
+      // 3. Reload page to let fresh state take full effect
       setTimeout(() => {
         window.location.reload();
       }, 700);

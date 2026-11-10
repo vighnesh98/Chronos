@@ -121,8 +121,14 @@
       to { opacity: 1; transform: scale(1); }
     }
 
+    /* Precision Clock Face Alignment */
+    .clock-dial-svg {
+      transform: rotate(0deg);
+      display: block;
+    }
     .clock-hand-group {
       transform-origin: 50px 50px;
+      transition: transform 0.1s linear;
     }
 
     /* Theme Overlays */
@@ -307,7 +313,7 @@
       </div>
 
       <div class="pt-4 border-t border-slate-100 text-center">
-        <p class="text-[11px] font-medium text-slate-400">Chronos v3.7 &bull; Read-Only Refresh Protected</p>
+        <p class="text-[11px] font-medium text-slate-400">Chronos v3.9 &bull; Universal Non-Overwrite Protection</p>
       </div>
     </aside>
 
@@ -399,10 +405,30 @@
           Cancel
         </button>
         <button onclick="confirmCreateNewTask()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-600/25 transition">
-          <i class="fa-solid fa-lock text-xs"></i>
+          <i class="fa-solid fa-check text-xs"></i>
           <span>Create & Lock</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Interactive Trophy Claim Pop-Up Modal (4h, 8h, 15h) -->
+  <div id="trophyClaimModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-md p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter relative overflow-hidden">
+      <div id="trophyModalBadgeBg" class="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-3 animate-bounce">
+        <i id="trophyModalIcon" class="fa-solid fa-award"></i>
+      </div>
+      <span id="trophyModalTag" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-900">
+        Milestone Reached
+      </span>
+      <h3 id="trophyModalTitle" class="text-xl font-black text-slate-900 mt-2">Bronze Trophy Ready!</h3>
+      <p id="trophyModalDesc" class="text-xs text-slate-500 mt-1 mb-6 leading-relaxed">
+        You've surpassed 4 hours of dedicated focus today. Collect your daily trophy now!
+      </p>
+      <button id="trophyClaimActionBtn" onclick="confirmClaimDailyTrophy()" class="w-full py-3 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg transition">
+        <i class="fa-solid fa-trophy text-amber-400"></i>
+        <span>Claim & Add to Collection</span>
+      </button>
     </div>
   </div>
 
@@ -1058,13 +1084,15 @@
     let bumperClaimCount = 0;
 
     let awardedHourlyPoints = 0;
-    let celebratedMilestonesToday = new Set();
+    
+    // Daily Trophy Tracking: Track calendar date and claimed tiers
+    let trophiesClaimDate = '';
+    let trophiesClaimedToday = [];
+    let pendingTrophyToClaim = null;
 
     // ====================================================
     // MASTER KILL-SWITCH: STRICT ZERO WRITE PERMISSION ON BOOT
     // ====================================================
-    // Starts completely disabled (false). While false, zero HTTP PUT or POST requests
-    // can ever be sent to Google Sheets. Only a deliberate user action (start/pause/buy) turns it on.
     let WRITE_PERMISSION_GRANTED = false;
     let isStateSyncing = false;
     let isAppendingSheetRow = false;
@@ -1404,22 +1432,45 @@
             if (row && row[0]) tableMap[row[0].trim()] = (row[1] || '').trim();
           });
 
-          // DIRECT VALUE ASSIGNMENT: Exactly whatever is in the spreadsheet goes to the app
-          if (tableMap['User_Points'] !== undefined) {
+          // UNIVERSAL ASSIGNMENT FOR ALL FIELDS: Direct source of truth from Google Sheets
+          if (tableMap['User_Points'] !== undefined && tableMap['User_Points'] !== '') {
             userPoints = parseInt(tableMap['User_Points'], 10) || 0;
           }
 
-          if (tableMap['Subscription_Expiry_Ms'] !== undefined) {
+          if (tableMap['Subscription_Expiry_Ms'] !== undefined && tableMap['Subscription_Expiry_Ms'] !== '') {
             subscriptionExpiry = parseInt(tableMap['Subscription_Expiry_Ms'], 10) || 0;
           }
 
-          if (tableMap['Bronze_Trophies'] !== undefined) bronzeTrophies = parseInt(tableMap['Bronze_Trophies'], 10) || 0;
-          if (tableMap['Silver_Trophies'] !== undefined) silverTrophies = parseInt(tableMap['Silver_Trophies'], 10) || 0;
-          if (tableMap['Golden_Trophies'] !== undefined) goldenTrophies = parseInt(tableMap['Golden_Trophies'], 10) || 0;
-          if (tableMap['Diamond_Trophy'] !== undefined) hasDiamondTrophy = (tableMap['Diamond_Trophy'] === 'TRUE');
-          if (tableMap['Streak_Days'] !== undefined) dailyStreakDays = parseInt(tableMap['Streak_Days'], 10) || 0;
-          if (tableMap['Bumper_Claims'] !== undefined) bumperClaimCount = parseInt(tableMap['Bumper_Claims'], 10) || 0;
+          if (tableMap['Bronze_Trophies'] !== undefined && tableMap['Bronze_Trophies'] !== '') {
+            bronzeTrophies = parseInt(tableMap['Bronze_Trophies'], 10) || 0;
+          }
+          if (tableMap['Silver_Trophies'] !== undefined && tableMap['Silver_Trophies'] !== '') {
+            silverTrophies = parseInt(tableMap['Silver_Trophies'], 10) || 0;
+          }
+          if (tableMap['Golden_Trophies'] !== undefined && tableMap['Golden_Trophies'] !== '') {
+            goldenTrophies = parseInt(tableMap['Golden_Trophies'], 10) || 0;
+          }
+          if (tableMap['Diamond_Trophy'] !== undefined && tableMap['Diamond_Trophy'] !== '') {
+            hasDiamondTrophy = (tableMap['Diamond_Trophy'] === 'TRUE');
+          }
+          if (tableMap['Streak_Days'] !== undefined && tableMap['Streak_Days'] !== '') {
+            dailyStreakDays = parseInt(tableMap['Streak_Days'], 10) || 0;
+          }
+          if (tableMap['Bumper_Claims'] !== undefined && tableMap['Bumper_Claims'] !== '') {
+            bumperClaimCount = parseInt(tableMap['Bumper_Claims'], 10) || 0;
+          }
           
+          if (tableMap['Trophies_Claim_Date']) trophiesClaimDate = tableMap['Trophies_Claim_Date'];
+          if (tableMap['Trophies_Claimed_Today']) {
+            trophiesClaimedToday = tableMap['Trophies_Claimed_Today'].split(',').map(s => s.trim()).filter(Boolean);
+          }
+
+          const currentDayStr = getTodayString();
+          if (trophiesClaimDate !== currentDayStr) {
+            trophiesClaimDate = currentDayStr;
+            trophiesClaimedToday = [];
+          }
+
           if (tableMap['Active_Theme']) activeTheme = tableMap['Active_Theme'];
           if (tableMap['Custom_Wallpaper_Url']) customWallpaperUrl = tableMap['Custom_Wallpaper_Url'];
           if (tableMap['Unlocked_Themes']) {
@@ -1498,6 +1549,8 @@
           ['Diamond_Trophy', hasDiamondTrophy ? 'TRUE' : 'FALSE'],
           ['Streak_Days', String(dailyStreakDays)],
           ['Bumper_Claims', String(bumperClaimCount)],
+          ['Trophies_Claim_Date', trophiesClaimDate || getTodayString()],
+          ['Trophies_Claimed_Today', trophiesClaimedToday.join(',')],
           ['Active_Theme', activeTheme],
           ['Custom_Wallpaper_Url', customWallpaperUrl],
           ['Unlocked_Themes', unlockedThemes.join(',')],
@@ -1505,7 +1558,7 @@
           ['Last_Cloud_Sync', new Date().toISOString()]
         ];
 
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B14?valueInputOption=USER_ENTERED`, {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B16?valueInputOption=USER_ENTERED`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ values: rows })
@@ -1586,6 +1639,7 @@
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
+    // Perfectly aligned SVG clock hand rotations: 0 deg points directly to 12 o'clock (x=50, y=10)
     function updateClockHands(id, totalSec) {
       const secG = document.getElementById(`${id}-sec-group`);
       const minG = document.getElementById(`${id}-min-group`);
@@ -1596,9 +1650,9 @@
       const m = (totalSec / 60) % 60;
       const h = (totalSec / 3600) % 12;
 
-      secG.style.transform = `rotate(${(s * 6).toFixed(1)}deg)`;
-      if (minG) minG.style.transform = `rotate(${(m * 6 + (s / 60) * 6).toFixed(1)}deg)`;
-      if (hourG) hourG.style.transform = `rotate(${(h * 30 + (m / 60) * 30).toFixed(1)}deg)`;
+      secG.setAttribute('transform', `rotate(${(s * 6).toFixed(1)} 50 50)`);
+      if (minG) minG.setAttribute('transform', `rotate(${(m * 6 + (s / 60) * 6).toFixed(1)} 50 50)`);
+      if (hourG) hourG.setAttribute('transform', `rotate(${(h * 30 + (m / 60) * 30).toFixed(1)} 50 50)`);
     }
 
     function tickTimers() {
@@ -1767,23 +1821,44 @@
         const clockArea = document.createElement('div');
         clockArea.className = 'my-2 flex flex-col items-center justify-center';
         clockArea.innerHTML = `
-          <svg viewBox="0 0 100 100" class="w-20 h-20 mb-2 drop-shadow-sm ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform">
+          <svg viewBox="0 0 100 100" class="clock-dial-svg w-20 h-20 mb-2 drop-shadow-sm ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform">
+            <!-- Dial Background & Rim -->
             <circle cx="50" cy="50" r="46" fill="${isRunning ? '#f0fdf4' : '#ffffff'}" stroke="${isRunning ? '#34d399' : '#e2e8f0'}" stroke-width="4"/>
-            <line x1="50" y1="10" x2="50" y2="15" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="90" y1="50" x2="85" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="50" y1="90" x2="50" y2="85" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="10" y1="50" x2="15" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
             
+            <!-- Cardinal Hour Markers aligned to exact pixel center -->
+            <line x1="50" y1="8" x2="50" y2="15" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+            <line x1="92" y1="50" x2="85" y2="50" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+            <line x1="50" y1="92" x2="50" y2="85" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+            <line x1="8" y1="50" x2="15" y2="50" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+
+            <!-- Minor 30-deg ticks -->
+            <line x1="71" y1="13.5" x2="68" y2="19" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="86.5" y1="29" x2="81" y2="32" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="86.5" y1="71" x2="81" y2="68" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="71" y1="86.5" x2="68" y2="81" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="29" y1="86.5" x2="32" y2="81" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="13.5" y1="71" x2="19" y2="68" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="13.5" y1="29" x2="19" y2="32" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="29" y1="13.5" x2="32" y2="19" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
+            
+            <!-- Hour Hand: Points straight to 12 o'clock at 0 deg -->
             <g id="clock-${task.id}-hour-group" class="clock-hand-group">
-              <line x1="50" y1="50" x2="50" y2="28" stroke="${isRunning ? '#065f46' : '#334155'}" stroke-width="4" stroke-linecap="round"/>
+              <line x1="50" y1="53" x2="50" y2="28" stroke="${isRunning ? '#065f46' : '#1e293b'}" stroke-width="4" stroke-linecap="round"/>
             </g>
+
+            <!-- Minute Hand: Points straight to 12 o'clock at 0 deg -->
             <g id="clock-${task.id}-min-group" class="clock-hand-group">
-              <line x1="50" y1="50" x2="50" y2="18" stroke="${isRunning ? '#10b981' : '#64748b'}" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="50" y1="54" x2="50" y2="17" stroke="${isRunning ? '#10b981' : '#475569'}" stroke-width="2.5" stroke-linecap="round"/>
             </g>
+
+            <!-- Second Hand: Points straight to 12 o'clock at 0 deg -->
             <g id="clock-${task.id}-sec-group" class="clock-hand-group">
-              <line x1="50" y1="50" x2="50" y2="15" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="50" y1="56" x2="50" y2="13" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="50" cy="50" r="2.5" fill="#ef4444"/>
             </g>
-            <circle cx="50" cy="50" r="4" fill="${isRunning ? '#059669' : '#475569'}"/>
+
+            <!-- Central Pivot Cap Pin -->
+            <circle cx="50" cy="50" r="4.5" fill="${isRunning ? '#059669' : '#0f172a'}" stroke="#ffffff" stroke-width="1.5"/>
           </svg>
           <div id="timer-${task.id}" class="text-2xl sm:text-3xl font-black font-mono tracking-tight ${
             isRunning ? 'text-emerald-700' : 'text-slate-800'
@@ -1830,6 +1905,13 @@
     // ----------------------------------------------------
     function checkHourlyPointsAndTrophies() {
       const now = Date.now();
+      const currentDay = getTodayString();
+
+      if (trophiesClaimDate !== currentDay) {
+        trophiesClaimDate = currentDay;
+        trophiesClaimedToday = [];
+      }
+
       let totalSeconds = 0;
       tasks.forEach(t => {
         totalSeconds += t.elapsed;
@@ -1838,7 +1920,7 @@
 
       const totalHours = Math.floor(totalSeconds / 3600);
 
-      // Multi-hour point claim consolidated check
+      // 1. Multi-hour focus point claim check (1 point per full hour)
       if (totalHours > awardedHourlyPoints) {
         const pointsToAdd = totalHours - awardedHourlyPoints;
         awardedHourlyPoints = totalHours;
@@ -1851,30 +1933,86 @@
         triggerConsolidatedPointsPopup(pointsToAdd);
       }
 
-      // Daily Trophies
-      if (totalHours >= 4 && !celebratedMilestonesToday.has(4)) {
-        celebratedMilestonesToday.add(4);
+      // 2. Interactive Trophy Milestone Claim Prompts (4h, 8h, 15h)
+      if (pendingTrophyToClaim) return;
+
+      if (totalHours >= 4 && !trophiesClaimedToday.includes('bronze')) {
+        showTrophyClaimModal('bronze');
+      } else if (totalHours >= 8 && !trophiesClaimedToday.includes('silver')) {
+        showTrophyClaimModal('silver');
+      } else if (totalHours >= 15 && !trophiesClaimedToday.includes('golden')) {
+        showTrophyClaimModal('golden');
+      }
+    }
+
+    function showTrophyClaimModal(tier) {
+      pendingTrophyToClaim = tier;
+      const modal = document.getElementById('trophyClaimModal');
+      const badgeBg = document.getElementById('trophyModalBadgeBg');
+      const icon = document.getElementById('trophyModalIcon');
+      const tag = document.getElementById('trophyModalTag');
+      const title = document.getElementById('trophyModalTitle');
+      const desc = document.getElementById('trophyModalDesc');
+      const btn = document.getElementById('trophyClaimActionBtn');
+
+      if (tier === 'bronze') {
+        badgeBg.className = 'w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-3 animate-bounce bg-gradient-to-tr from-amber-600 to-amber-400 text-white shadow-amber-500/25';
+        icon.className = 'fa-solid fa-award';
+        tag.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-900';
+        tag.textContent = '4-Hour Daily Milestone';
+        title.textContent = 'Bronze Trophy Unlocked!';
+        desc.textContent = 'Awesome focus! You have achieved 4 hours of total focus today. Collect your trophy to stack your rewards and claim bumper bonuses.';
+        btn.className = 'w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-600/25 transition';
+      } else if (tier === 'silver') {
+        badgeBg.className = 'w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-3 animate-bounce bg-gradient-to-tr from-slate-400 to-slate-200 text-slate-800 shadow-slate-400/25';
+        icon.className = 'fa-solid fa-medal';
+        tag.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-200 text-slate-800';
+        tag.textContent = '8-Hour Daily Milestone';
+        title.textContent = 'Silver Trophy Unlocked!';
+        desc.textContent = 'Incredible dedication! 8 hours of productive focus completed today. Claim your silver trophy now!';
+        btn.className = 'w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-slate-800/25 transition';
+      } else if (tier === 'golden') {
+        badgeBg.className = 'w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-3 animate-bounce bg-gradient-to-tr from-yellow-500 to-amber-300 text-slate-950 shadow-yellow-500/30';
+        icon.className = 'fa-solid fa-crown';
+        tag.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-yellow-100 text-yellow-900';
+        tag.textContent = '15-Hour Extreme Limit';
+        title.textContent = 'Golden Trophy Master!';
+        desc.textContent = 'Legendary achievement! 15 hours of deep work in a single day. Collect your elite Golden Trophy!';
+        btn.className = 'w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/30 transition';
+      }
+
+      modal.classList.remove('hidden');
+      if (typeof confetti === 'function') confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+    }
+
+    function confirmClaimDailyTrophy() {
+      if (!pendingTrophyToClaim) return;
+
+      WRITE_PERMISSION_GRANTED = true;
+
+      if (pendingTrophyToClaim === 'bronze') {
         bronzeTrophies += 1;
-        if (WRITE_PERMISSION_GRANTED) syncStateToSpreadsheet();
-        updateTrophiesDisplay();
-        showToast('🥉 Bronze Trophy earned! (4 Hours Focus)');
-      }
-
-      if (totalHours >= 8 && !celebratedMilestonesToday.has(8)) {
-        celebratedMilestonesToday.add(8);
+        trophiesClaimedToday.push('bronze');
+        showToast('🥉 Bronze Trophy added to your collection!');
+      } else if (pendingTrophyToClaim === 'silver') {
         silverTrophies += 1;
-        if (WRITE_PERMISSION_GRANTED) syncStateToSpreadsheet();
-        updateTrophiesDisplay();
-        showToast('🥈 Silver Trophy earned! (8 Hours Focus)');
+        trophiesClaimedToday.push('silver');
+        showToast('🥈 Silver Trophy added to your collection!');
+      } else if (pendingTrophyToClaim === 'golden') {
+        goldenTrophies += 1;
+        trophiesClaimedToday.push('golden');
+        showToast('🥇 Golden Trophy added to your collection!');
       }
 
-      if (totalHours >= 15 && !celebratedMilestonesToday.has(15)) {
-        celebratedMilestonesToday.add(15);
-        goldenTrophies += 1;
-        if (WRITE_PERMISSION_GRANTED) syncStateToSpreadsheet();
-        updateTrophiesDisplay();
-        showToast('🥇 Golden Trophy earned! (15 Hours Extreme Focus)');
-      }
+      pendingTrophyToClaim = null;
+      document.getElementById('trophyClaimModal').classList.add('hidden');
+
+      updateTrophiesDisplay();
+      syncStateToSpreadsheet();
+
+      setTimeout(() => {
+        checkHourlyPointsAndTrophies();
+      }, 500);
     }
 
     function triggerConsolidatedPointsPopup(pts) {

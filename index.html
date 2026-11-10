@@ -848,6 +848,26 @@
     Message
   </div>
 
+  <!-- Fullscreen Cloud Sync Loading Splash Modal -->
+  <div id="cloudSyncLoader" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-md p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-xs w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
+      <div class="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+        <div class="absolute inset-0 rounded-full border-4 border-brand-100 border-t-brand-600 animate-spin"></div>
+        <div class="w-10 h-10 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center text-lg shadow-xs">
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+        </div>
+      </div>
+      <h3 class="text-base font-extrabold text-slate-900" id="syncLoaderTitle">Syncing with Cloud</h3>
+      <p class="text-xs text-slate-500 mt-1 leading-relaxed" id="syncLoaderSubtitle">
+        Retrieving your latest tasks, timers, and subscription from Google Sheets...
+      </p>
+      <div class="mt-4 flex items-center justify-center gap-1.5 text-[10px] font-bold text-brand-600 uppercase tracking-wider">
+        <span class="w-2 h-2 rounded-full bg-brand-600 animate-ping"></span>
+        <span>Please wait a moment</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Main JavaScript Logic -->
   <script>
     // ----------------------------------------------------
@@ -1043,7 +1063,7 @@
     // ----------------------------------------------------
     // App Initialization & State
     // ----------------------------------------------------
-    window.addEventListener('load', () => {
+    window.addEventListener('load', async () => {
       loadSettingsInputs();
       loadSubscription();
       loadTasks();
@@ -1052,6 +1072,13 @@
       renderTasks();
       updateHeroMetrics();
       requestNotificationPermission();
+
+      // If user is already authenticated, show the loading splash and fetch freshest spreadsheet state immediately
+      if (accessToken) {
+        showSyncLoader('Refreshing Data', 'Connecting to your Google Sheet to pull the latest workspace...');
+        await syncWithSpreadsheet();
+        hideSyncLoader();
+      }
 
       // Main 500ms ticker for timers and hands
       setInterval(() => {
@@ -1065,61 +1092,28 @@
       startPeriodicSheetSync();
 
       // Window Focus & Visibility reconciliation
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
+      document.addEventListener('visibilitychange', async () => {
+        if (!document.hidden && accessToken) {
           reconcileTimers();
           checkMidnightReset();
+          await pullStateFromSpreadsheet();
           enforceSubscriptionCheck();
         }
       });
     });
 
-    // ----------------------------------------------------
-    // Guaranteed 1-Minute Periodic Sheets Sync
-    // ----------------------------------------------------
-    function startPeriodicSheetSync() {
-      if (periodicSyncInterval) clearInterval(periodicSyncInterval);
-      periodicSyncInterval = setInterval(async () => {
-        if (!accessToken || !isSubscriptionActive()) return;
-
-        const now = Date.now();
-        // Check for running task: log periodic checkpoint progress
-        for (const task of tasks) {
-          if (task.isRunning && task.lastStarted) {
-            const currentSeconds = (now - task.lastStarted) / 1000;
-            // Only log if active for at least 15 seconds
-            if (currentSeconds >= 15) {
-              const minutes = (currentSeconds / 60).toFixed(2);
-              task.elapsed += currentSeconds;
-              task.lastStarted = now; // reset session start anchor
-              saveTasks();
-              await logTaskEventToSheets(task.title, 'Active-Checkpoint', minutes);
-            }
-          }
-        }
-
-        // Drive state sync check
-        syncToDrive();
-      }, 60000); // exactly every 60 seconds
+    function showSyncLoader(title = 'Syncing with Cloud', sub = 'Pulling data from Google Sheets...') {
+      const loader = document.getElementById('cloudSyncLoader');
+      if (loader) {
+        document.getElementById('syncLoaderTitle').textContent = title;
+        document.getElementById('syncLoaderSubtitle').textContent = sub;
+        loader.classList.remove('hidden');
+      }
     }
 
-    // PWA Install Prompt Listener
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      const btn = document.getElementById('pwaInstallBtn');
-      if (btn) btn.classList.remove('hidden');
-    });
-
-    function promptPWAInstall() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(() => {
-          deferredPrompt = null;
-        });
-      } else {
-        showToast('To install, tap your browser menu (⋮) and select "Install app"');
-      }
+    function hideSyncLoader() {
+      const loader = document.getElementById('cloudSyncLoader');
+      if (loader) loader.classList.add('hidden');
     }
 
     function toggleNavDrawer() {
@@ -1294,7 +1288,10 @@
 
             updateAuthUI(true);
             showToast('Signed in successfully');
-            syncWithSpreadsheet();
+            
+            showSyncLoader('Syncing Account', 'Loading tasks and subscription from your spreadsheet...');
+            await syncWithSpreadsheet();
+            hideSyncLoader();
           } else {
             showToast('Sign-in cancelled or failed');
           }
@@ -1460,9 +1457,10 @@
       }
 
       const now = Date.now();
-      const currentExpiry = subscriptionExpiry > now ? subscriptionExpiry : now;
+      // Ensure clean addition: if expired, start strictly from current time
+      const baseAnchor = (subscriptionExpiry > now) ? subscriptionExpiry : now;
       const additionalMs = pendingPurchaseDays * 24 * 60 * 60 * 1000;
-      const newExpiry = currentExpiry + additionalMs;
+      const newExpiry = baseAnchor + additionalMs;
 
       saveSubscription(newExpiry);
       closePlanCodeModal();
@@ -1987,7 +1985,6 @@
         } else if (found.length > 1) {
           // Multiple spreadsheets found: prompt user to provide the exact link in Settings
           showToast('⚠️ Multiple spreadsheets found. Please paste the exact link in Settings.');
-          // Default to the most recently modified one while warning the user
           sheetId = found[0].id;
           localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
           await ensureAppSheetsExist(sheetId);
@@ -2067,7 +2064,7 @@
       } catch(e) {}
     }
 
-    // Sheet 2: Read App State (Replaces JSON File)
+    // Sheet 2: Read App State (Single Source of Truth from Spreadsheet)
     async function pullStateFromSpreadsheet() {
       if (!accessToken) return;
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
@@ -2082,33 +2079,35 @@
         if (!rawJson) return;
 
         const stateData = JSON.parse(rawJson);
-        let stateChanged = false;
 
-        // Adopt subscription validity if cloud is more recent / higher
-        if (stateData.subscriptionExpiry && stateData.subscriptionExpiry > subscriptionExpiry) {
+        // 1. Strictly align subscription expiry from cloud spreadsheet
+        if (typeof stateData.subscriptionExpiry === 'number') {
           subscriptionExpiry = stateData.subscriptionExpiry;
           localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
           updateSubscriptionTicker();
           enforceSubscriptionCheck();
         }
 
-        // Adopt tasks from Sheet 2 without losing current active running timer on this device
-        if (Array.isArray(stateData.tasks) && stateData.tasks.length > 0) {
-          const runningTask = tasks.find(t => t.isRunning);
-          tasks = stateData.tasks.map(t => {
-            if (runningTask && t.id === runningTask.id) {
-              return { ...t, isRunning: true, lastStarted: runningTask.lastStarted };
+        // 2. Synchronize tasks from Sheet 2
+        if (Array.isArray(stateData.tasks)) {
+          const currentRunning = tasks.find(t => t.isRunning);
+          tasks = stateData.tasks.map(cloudTask => {
+            if (currentRunning && cloudTask.id === currentRunning.id) {
+              return { ...cloudTask, isRunning: true, lastStarted: currentRunning.lastStarted };
             }
-            return { ...t, isRunning: false, lastStarted: null };
+            return {
+              id: cloudTask.id,
+              title: cloudTask.title,
+              elapsed: Number(cloudTask.elapsed) || 0,
+              isRunning: false,
+              lastStarted: null
+            };
           });
           localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
-          stateChanged = true;
         }
 
-        if (stateChanged) {
-          renderTasks();
-          updateHeroMetrics();
-        }
+        renderTasks();
+        updateHeroMetrics();
       } catch(e) {}
     }
 

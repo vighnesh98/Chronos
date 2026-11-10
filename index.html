@@ -121,7 +121,6 @@
       to { opacity: 1; transform: scale(1); }
     }
 
-    /* Precision Clock Face Alignment */
     .clock-dial-svg {
       transform: rotate(0deg);
       display: block;
@@ -131,7 +130,6 @@
       transition: transform 0.1s linear;
     }
 
-    /* Theme Overlays */
     body.theme-midnight {
       background-color: #090d16 !important;
       color: #f1f5f9 !important;
@@ -413,7 +411,7 @@
   </div>
 
   <!-- Interactive Trophy Claim Pop-Up Modal (4h, 8h, 15h) -->
-  <div id="trophyClaimModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-md p-4 hidden">
+  <div id="trophyClaimModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-955/75 backdrop-blur-md p-4 hidden">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter relative overflow-hidden">
       <div id="trophyModalBadgeBg" class="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-3 animate-bounce">
         <i id="trophyModalIcon" class="fa-solid fa-award"></i>
@@ -972,12 +970,15 @@
     </div>
   </div>
 
-  <!-- OAuth & Cloud Settings Modal -->
-  <div id="settingsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-md w-full p-5 shadow-2xl border border-slate-100 fade-enter">
+  <!-- OAuth & Cloud Settings Modal (Higher z-[60] so it renders above Auth Gate) -->
+  <div id="settingsModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 fade-enter">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">OAuth & Cloud Settings</h4>
-        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-gear text-slate-500"></i>
+          <span>OAuth & Cloud Settings</span>
+        </h4>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <label class="block text-[11px] font-semibold text-slate-600 mb-1">Google OAuth 2.0 Client ID</label>
       <input type="text" id="clientIdInput" placeholder="xxxx-xxxx.apps.googleusercontent.com" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-3" />
@@ -989,13 +990,13 @@
       <input type="text" id="sheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/... or ID" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-mono text-slate-800 mb-4" />
 
       <div class="flex justify-end gap-2">
-        <button onclick="closeSettingsModal()" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">Cancel</button>
+        <button onclick="closeSettingsModal()" class="px-3.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">Cancel</button>
         <button onclick="saveSettings()" class="px-4 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold shadow-sm hover:bg-brand-700">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- Mandatory Auth Gate Modal -->
+  <!-- Mandatory Auth Gate Modal (z-50) -->
   <div id="mandatoryAuthGate" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 hidden">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
       <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-brand-500/25 mb-4">
@@ -1016,7 +1017,7 @@
         <span>Continue with Google</span>
       </button>
 
-      <button onclick="openSettingsModal()" class="mt-4 text-[11px] font-semibold text-brand-600 hover:underline">
+      <button type="button" onclick="openSettingsModal()" class="mt-4 text-[11px] font-semibold text-brand-600 hover:underline cursor-pointer block mx-auto py-1 px-2">
         Configure OAuth Client ID
       </button>
     </div>
@@ -1041,7 +1042,7 @@
   </div>
 
   <!-- Global Toast -->
-  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white text-xs font-medium px-4 py-2 rounded-full shadow-lg pointer-events-none transition-all duration-300 opacity-0 translate-y-3">
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[70] bg-slate-900/90 text-white text-xs font-medium px-4 py-2 rounded-full shadow-lg pointer-events-none transition-all duration-300 opacity-0 translate-y-3">
     Message
   </div>
 
@@ -1061,6 +1062,7 @@
     let tokenExpiration = 0;
     let userProfile = null;
     let tokenClient = null;
+    let isRequestingToken = false;
     let deferredPrompt = null;
     let wakeLock = null;
     let audioContext = null;
@@ -1090,9 +1092,7 @@
     let trophiesClaimedToday = [];
     let pendingTrophyToClaim = null;
 
-    // ====================================================
     // MASTER KILL-SWITCH: STRICT ZERO WRITE PERMISSION ON BOOT
-    // ====================================================
     let WRITE_PERMISSION_GRANTED = false;
     let isStateSyncing = false;
     let isAppendingSheetRow = false;
@@ -1149,7 +1149,6 @@
     // App Initialization
     // ----------------------------------------------------
     window.addEventListener('load', async () => {
-      // Physical lock: Ensure writes are completely killed on load
       WRITE_PERMISSION_GRANTED = false;
 
       loadSettingsInputs();
@@ -1160,20 +1159,22 @@
       updateTrophiesDisplay();
       applyWorkspaceTheme(activeTheme, customWallpaperUrl);
 
-      // Start main ticker (read-only)
       setInterval(() => {
         tickTimers();
         updateCountdownToMidnight();
         updateSubscriptionTicker();
       }, 500);
 
-      // 60-second periodic checkpoint sync (only runs if write permission was granted by user interaction)
       setInterval(async () => {
         if (!WRITE_PERMISSION_GRANTED || !accessToken || !isSubscriptionActive()) return;
         await flushActiveTaskCheckpoints();
       }, 60000);
 
-      // Tab visibility listener (reconciles timers, never writes)
+      // Heartbeat token checker every 2 minutes
+      setInterval(() => {
+        verifyAndRefreshGoogleToken();
+      }, 120000);
+
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
           reconcileTimers();
@@ -1182,7 +1183,6 @@
         }
       });
 
-      // Fetch authoritative state from Google Sheets
       if (accessToken) {
         await syncWithSpreadsheet();
       } else {
@@ -1203,7 +1203,7 @@
     }
 
     // ----------------------------------------------------
-    // Robust Google Authentication
+    // Robust Google Authentication & Proactive Session Renewal
     // ----------------------------------------------------
     function initAuthSession() {
       const raw = localStorage.getItem(STORAGE_KEY_AUTH);
@@ -1258,6 +1258,7 @@
         client_id: cid,
         scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
         callback: async (resp) => {
+          isRequestingToken = false;
           if (resp && resp.access_token) {
             accessToken = resp.access_token;
             tokenExpiration = Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000;
@@ -1294,6 +1295,9 @@
         return;
       }
 
+      if (isRequestingToken) return;
+      isRequestingToken = true;
+
       tokenClient = setupGoogleTokenClient(async () => {
         showToast('Signed in successfully');
         await syncWithSpreadsheet();
@@ -1302,14 +1306,16 @@
       if (tokenClient) {
         tokenClient.requestAccessToken({ prompt: promptUser ? '' : 'none' });
       } else {
+        isRequestingToken = false;
         showToast('Google Services initializing, please retry...');
       }
     }
 
     async function verifyAndRefreshGoogleToken() {
-      if (!accessToken || Date.now() >= tokenExpiration - 300000) {
+      // Refresh token if within 10 minutes of expiry or already expired, without logging user out
+      if (!accessToken || Date.now() >= (tokenExpiration - 600000)) {
         const cid = getClientId();
-        if (cid && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+        if (cid && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2 && !isRequestingToken) {
           const silentClient = setupGoogleTokenClient(() => {});
           if (silentClient) {
             silentClient.requestAccessToken({ prompt: 'none' });
@@ -1352,18 +1358,20 @@
       if (!accessToken) return null;
       let sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
 
-      // Verify cached ID
       if (sheetId) {
         try {
           const res = await fetch(`https://www.googleapis.com/drive/v3/files/${sheetId}?fields=id,trashed`, {
             headers: { Authorization: `Bearer ${accessToken}` }
           });
-          const meta = await res.json();
-          if (meta && !meta.trashed && meta.id) return sheetId;
+          if (res.status === 401) {
+            await verifyAndRefreshGoogleToken();
+          } else {
+            const meta = await res.json();
+            if (meta && !meta.trashed && meta.id) return sheetId;
+          }
         } catch(e) {}
       }
 
-      // Query Drive for existing spreadsheet
       try {
         const query = encodeURIComponent("name = 'Chronos Focus Logs' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
         const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed)&orderBy=modifiedTime desc`, {
@@ -1377,7 +1385,6 @@
         }
       } catch(e) {}
 
-      // Create new two-sheet spreadsheet only if absolutely no file exists
       try {
         const payload = {
           properties: { title: 'Chronos Focus Logs' },
@@ -1395,7 +1402,6 @@
         sheetId = created.spreadsheetId;
         localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
 
-        // Header for Sheet 1
         const headersLogs = [['Timestamp', 'Date', 'ISO_Week', 'Month', 'Task_Name', 'Event', 'Duration_Mins']];
         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A1:G1:append?valueInputOption=USER_ENTERED`, {
           method: 'POST',
@@ -1409,19 +1415,17 @@
       }
     }
 
-    // PURE GET ONLY - Reads directly from the sheet and assigns straight to memory & UI
     async function pullStateFromSpreadsheet() {
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
       if (!sheetId || !accessToken) return;
 
       try {
-        // Pure GET of Sheet 2: App_State
         const resState = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B20`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         
         if (resState.status === 401) {
-          verifyAndRefreshGoogleToken();
+          await verifyAndRefreshGoogleToken();
           return;
         }
 
@@ -1432,7 +1436,6 @@
             if (row && row[0]) tableMap[row[0].trim()] = (row[1] || '').trim();
           });
 
-          // UNIVERSAL ASSIGNMENT FOR ALL FIELDS: Direct source of truth from Google Sheets
           if (tableMap['User_Points'] !== undefined && tableMap['User_Points'] !== '') {
             userPoints = parseInt(tableMap['User_Points'], 10) || 0;
           }
@@ -1488,7 +1491,6 @@
           }
         }
 
-        // Pure GET of Sheet 1: Task_Logs to match local clocks with logged time
         try {
           const todayStr = getTodayString();
           const resLogs = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A2:G`, {
@@ -1512,7 +1514,6 @@
           }
         } catch(e) {}
 
-        // Update the screen immediately with the values from Google Sheets
         renderTasks();
         updateHeroMetrics();
         updatePointsDisplay();
@@ -1527,11 +1528,7 @@
       }
     }
 
-    // ====================================================
-    // STRICT GUARDED WRITE ROUTINES (NEVER RUN ON REFRESH)
-    // ====================================================
     async function syncStateToSpreadsheet() {
-      // IF WRITE PERMISSION IS NOT EXPLICITLY GRANTED BY A USER TOUCH, ABORT INSTANTLY!
       if (!WRITE_PERMISSION_GRANTED) return;
 
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
@@ -1558,11 +1555,14 @@
           ['Last_Cloud_Sync', new Date().toISOString()]
         ];
 
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B16?valueInputOption=USER_ENTERED`, {
+        const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B16?valueInputOption=USER_ENTERED`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ values: rows })
         });
+        if (res.status === 401) {
+          verifyAndRefreshGoogleToken();
+        }
       } catch(e) {
       } finally {
         isStateSyncing = false;
@@ -1599,11 +1599,14 @@
 
         cachedAnalyticsRows = null;
 
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A1:G1:append?valueInputOption=USER_ENTERED`, {
+        const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A1:G1:append?valueInputOption=USER_ENTERED`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ values: [row] })
         });
+        if (res.status === 401) {
+          verifyAndRefreshGoogleToken();
+        }
       } catch(e) {
       } finally {
         isAppendingSheetRow = false;
@@ -1639,7 +1642,6 @@
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
-    // Perfectly aligned SVG clock hand rotations: 0 deg points directly to 12 o'clock (x=50, y=10)
     function updateClockHands(id, totalSec) {
       const secG = document.getElementById(`${id}-sec-group`);
       const minG = document.getElementById(`${id}-min-group`);
@@ -1701,14 +1703,12 @@
       document.getElementById('slotCountBadge').textContent = `${tasks.length} / 5 slots`;
     }
 
-    // User physically presses Play/Pause -> Write permission is officially granted!
     function toggleTask(id) {
       if (!accessToken) {
         requestGoogleToken(true);
         return;
       }
       
-      // USER ACTION OCCURRED: PERMISSION TO SYNC GRANTED
       WRITE_PERMISSION_GRANTED = true;
 
       if (!isSubscriptionActive()) {
@@ -1777,7 +1777,6 @@
         return;
       }
 
-      // USER ACTION OCCURRED: PERMISSION TO SYNC GRANTED
       WRITE_PERMISSION_GRANTED = true;
 
       tasks.unshift({
@@ -1822,16 +1821,11 @@
         clockArea.className = 'my-2 flex flex-col items-center justify-center';
         clockArea.innerHTML = `
           <svg viewBox="0 0 100 100" class="clock-dial-svg w-20 h-20 mb-2 drop-shadow-sm ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform">
-            <!-- Dial Background & Rim -->
             <circle cx="50" cy="50" r="46" fill="${isRunning ? '#f0fdf4' : '#ffffff'}" stroke="${isRunning ? '#34d399' : '#e2e8f0'}" stroke-width="4"/>
-            
-            <!-- Cardinal Hour Markers aligned to exact pixel center -->
             <line x1="50" y1="8" x2="50" y2="15" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
             <line x1="92" y1="50" x2="85" y2="50" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
             <line x1="50" y1="92" x2="50" y2="85" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
             <line x1="8" y1="50" x2="15" y2="50" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
-
-            <!-- Minor 30-deg ticks -->
             <line x1="71" y1="13.5" x2="68" y2="19" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
             <line x1="86.5" y1="29" x2="81" y2="32" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
             <line x1="86.5" y1="71" x2="81" y2="68" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
@@ -1841,23 +1835,19 @@
             <line x1="13.5" y1="29" x2="19" y2="32" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
             <line x1="29" y1="13.5" x2="32" y2="19" stroke="#cbd5e1" stroke-width="1.8" stroke-linecap="round"/>
             
-            <!-- Hour Hand: Points straight to 12 o'clock at 0 deg -->
             <g id="clock-${task.id}-hour-group" class="clock-hand-group">
               <line x1="50" y1="53" x2="50" y2="28" stroke="${isRunning ? '#065f46' : '#1e293b'}" stroke-width="4" stroke-linecap="round"/>
             </g>
 
-            <!-- Minute Hand: Points straight to 12 o'clock at 0 deg -->
             <g id="clock-${task.id}-min-group" class="clock-hand-group">
               <line x1="50" y1="54" x2="50" y2="17" stroke="${isRunning ? '#10b981' : '#475569'}" stroke-width="2.5" stroke-linecap="round"/>
             </g>
 
-            <!-- Second Hand: Points straight to 12 o'clock at 0 deg -->
             <g id="clock-${task.id}-sec-group" class="clock-hand-group">
               <line x1="50" y1="56" x2="50" y2="13" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/>
               <circle cx="50" cy="50" r="2.5" fill="#ef4444"/>
             </g>
 
-            <!-- Central Pivot Cap Pin -->
             <circle cx="50" cy="50" r="4.5" fill="${isRunning ? '#059669' : '#0f172a'}" stroke="#ffffff" stroke-width="1.5"/>
           </svg>
           <div id="timer-${task.id}" class="text-2xl sm:text-3xl font-black font-mono tracking-tight ${
@@ -1920,7 +1910,6 @@
 
       const totalHours = Math.floor(totalSeconds / 3600);
 
-      // 1. Multi-hour focus point claim check (1 point per full hour)
       if (totalHours > awardedHourlyPoints) {
         const pointsToAdd = totalHours - awardedHourlyPoints;
         awardedHourlyPoints = totalHours;
@@ -1933,7 +1922,6 @@
         triggerConsolidatedPointsPopup(pointsToAdd);
       }
 
-      // 2. Interactive Trophy Milestone Claim Prompts (4h, 8h, 15h)
       if (pendingTrophyToClaim) return;
 
       if (totalHours >= 4 && !trophiesClaimedToday.includes('bronze')) {
@@ -2429,8 +2417,13 @@
       overlay.classList.toggle('hidden');
     }
 
-    function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
-    function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
+    function openSettingsModal() { 
+      loadSettingsInputs();
+      document.getElementById('settingsModal').classList.remove('hidden'); 
+    }
+    function closeSettingsModal() { 
+      document.getElementById('settingsModal').classList.add('hidden'); 
+    }
 
     function loadSettingsInputs() {
       const cid = localStorage.getItem(STORAGE_KEY_CLIENT_ID);
@@ -2518,6 +2511,10 @@
         const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A2:G`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
+        if (res.status === 401) {
+          verifyAndRefreshGoogleToken();
+          return;
+        }
         const data = await res.json();
         cachedAnalyticsRows = data.values || [];
         processAndRenderAnalytics(cachedAnalyticsRows);

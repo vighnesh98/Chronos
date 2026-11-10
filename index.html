@@ -121,7 +121,6 @@
       to { opacity: 1; transform: scale(1); }
     }
 
-    /* Fixed-Origin Analog Clock Hands */
     .clock-hand-group {
       transform-origin: 50px 50px;
     }
@@ -163,7 +162,7 @@
   <div id="wallpaperBackdrop"></div>
   <canvas id="bubbleCanvas"></canvas>
 
-  <!-- Cloud Sync Loading Splash Screen (Strict Read-First Hydration) -->
+  <!-- Cloud Sync Loading Splash Screen -->
   <div id="cloudSyncLoader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/70 backdrop-blur-md text-white transition-opacity duration-300">
     <div class="glass-panel p-8 rounded-3xl flex flex-col items-center max-w-sm w-full mx-4 text-center shadow-2xl border border-white/20">
       <div class="relative w-16 h-16 mb-4 flex items-center justify-center">
@@ -203,7 +202,7 @@
       <!-- Right: Points Pill + Install + Avatar -->
       <div class="flex items-center gap-2">
         
-        <!-- Live Chronos Points Pill (Clickable into Shop) -->
+        <!-- Live Chronos Points Pill -->
         <button onclick="openShopModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition shadow-xs group">
           <i class="fa-solid fa-coins text-amber-500 text-xs group-hover:rotate-12 transition"></i>
           <span id="headerPointsCount" class="text-xs font-black font-mono">0</span>
@@ -308,7 +307,7 @@
       </div>
 
       <div class="pt-4 border-t border-slate-100 text-center">
-        <p class="text-[11px] font-medium text-slate-400">Chronos v3.6 &bull; Protected Cloud Sync</p>
+        <p class="text-[11px] font-medium text-slate-400">Chronos v3.7 &bull; Read-Only Refresh Protected</p>
       </div>
     </aside>
 
@@ -374,7 +373,7 @@
     </main>
 
     <footer class="mt-8 text-center text-slate-400 text-[11px] py-2">
-      Chronos Focus &bull; Sheet-Authoritative Time &bull; Auto-resets at 12:00 AM
+      Chronos Focus &bull; Pure Spreadsheet Reader &bull; Auto-resets at 12:00 AM
     </footer>
 
   </div>
@@ -1026,11 +1025,8 @@
     // State & Constants
     // ----------------------------------------------------
     const STORAGE_KEY_AUTH = 'chronos_auth_state';
-    const STORAGE_KEY_TASKS = 'chronos_tasks_state';
     const STORAGE_KEY_CLIENT_ID = 'chronos_client_id';
     const STORAGE_KEY_SHEET_ID = 'chronos_sheet_id';
-    const STORAGE_KEY_SUBSCRIPTION = 'chronos_subscription_state';
-    const STORAGE_KEY_REWARDS = 'chronos_rewards_v3';
 
     const PLAN_SECRET_CODE = '@@112267';
 
@@ -1050,7 +1046,6 @@
 
     // Version 3 Gamification State
     let userPoints = 0;
-    let highestConfirmedPoints = 0; // Anti-regression lock
     let activeTheme = 'default';
     let customWallpaperUrl = '';
     let unlockedThemes = ['default'];
@@ -1065,9 +1060,12 @@
     let awardedHourlyPoints = 0;
     let celebratedMilestonesToday = new Set();
 
-    // Critical Write-Lock Flags
-    let isCloudHydrated = false;
-    let isStartupOrRefresh = true;
+    // ====================================================
+    // MASTER KILL-SWITCH: STRICT ZERO WRITE PERMISSION ON BOOT
+    // ====================================================
+    // Starts completely disabled (false). While false, zero HTTP PUT or POST requests
+    // can ever be sent to Google Sheets. Only a deliberate user action (start/pause/buy) turns it on.
+    let WRITE_PERMISSION_GRANTED = false;
     let isStateSyncing = false;
     let isAppendingSheetRow = false;
 
@@ -1123,40 +1121,40 @@
     // App Initialization
     // ----------------------------------------------------
     window.addEventListener('load', async () => {
+      // Physical lock: Ensure writes are completely killed on load
+      WRITE_PERMISSION_GRANTED = false;
+
       loadSettingsInputs();
-      loadLocalState();
       initAuthSession();
-      checkMidnightReset();
       renderTasks();
       updateHeroMetrics();
       updatePointsDisplay();
       updateTrophiesDisplay();
       applyWorkspaceTheme(activeTheme, customWallpaperUrl);
 
-      // Start ticker
+      // Start main ticker (read-only)
       setInterval(() => {
         tickTimers();
         updateCountdownToMidnight();
         updateSubscriptionTicker();
       }, 500);
 
-      // Periodic checkpoint sync (60s)
+      // 60-second periodic checkpoint sync (only runs if write permission was granted by user interaction)
       setInterval(async () => {
-        if (!accessToken || !isSubscriptionActive() || !isCloudHydrated || isStartupOrRefresh) return;
+        if (!WRITE_PERMISSION_GRANTED || !accessToken || !isSubscriptionActive()) return;
         await flushActiveTaskCheckpoints();
       }, 60000);
 
-      // Visibility change handler (Silent token check & timer reconciliation)
+      // Tab visibility listener (reconciles timers, never writes)
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
           reconcileTimers();
-          checkMidnightReset();
           enforceSubscriptionCheck();
           verifyAndRefreshGoogleToken();
         }
       });
 
-      // Hydrate from cloud if token is ready
+      // Fetch authoritative state from Google Sheets
       if (accessToken) {
         await syncWithSpreadsheet();
       } else {
@@ -1177,65 +1175,7 @@
     }
 
     // ----------------------------------------------------
-    // Local State Loading
-    // ----------------------------------------------------
-    function loadLocalState() {
-      const sub = localStorage.getItem(STORAGE_KEY_SUBSCRIPTION);
-      if (sub) subscriptionExpiry = parseInt(sub, 10) || 0;
-
-      const tSaved = localStorage.getItem(STORAGE_KEY_TASKS);
-      if (tSaved) {
-        try { tasks = JSON.parse(tSaved); } catch(e) { tasks = []; }
-      }
-      if (!Array.isArray(tasks)) tasks = [];
-
-      const rSaved = localStorage.getItem(STORAGE_KEY_REWARDS);
-      if (rSaved) {
-        try {
-          const r = JSON.parse(rSaved);
-          userPoints = Math.max(0, parseInt(r.points, 10) || 0);
-          highestConfirmedPoints = Math.max(highestConfirmedPoints, userPoints);
-          bronzeTrophies = parseInt(r.bronze, 10) || 0;
-          silverTrophies = parseInt(r.silver, 10) || 0;
-          goldenTrophies = parseInt(r.golden, 10) || 0;
-          hasDiamondTrophy = !!r.diamond;
-          dailyStreakDays = parseInt(r.streak, 10) || 0;
-          bumperClaimCount = parseInt(r.bumperClaims, 10) || 0;
-          activeTheme = r.activeTheme || 'default';
-          customWallpaperUrl = r.customWallpaper || '';
-          unlockedThemes = Array.isArray(r.unlockedThemes) ? r.unlockedThemes : ['default'];
-        } catch(e) {}
-      }
-    }
-
-    function saveLocalRewards() {
-      // Points can never drop unless spending
-      highestConfirmedPoints = Math.max(highestConfirmedPoints, userPoints);
-      const payload = {
-        points: userPoints,
-        bronze: bronzeTrophies,
-        silver: silverTrophies,
-        golden: goldenTrophies,
-        diamond: hasDiamondTrophy,
-        streak: dailyStreakDays,
-        bumperClaims: bumperClaimCount,
-        activeTheme: activeTheme,
-        customWallpaper: customWallpaperUrl,
-        unlockedThemes: unlockedThemes
-      };
-      localStorage.setItem(STORAGE_KEY_REWARDS, JSON.stringify(payload));
-      updatePointsDisplay();
-      updateTrophiesDisplay();
-    }
-
-    function saveTasksLocally() {
-      localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
-      renderTasks();
-      updateHeroMetrics();
-    }
-
-    // ----------------------------------------------------
-    // Robust Google Authentication with Silent Token Renewal
+    // Robust Google Authentication
     // ----------------------------------------------------
     function initAuthSession() {
       const raw = localStorage.getItem(STORAGE_KEY_AUTH);
@@ -1294,7 +1234,6 @@
             accessToken = resp.access_token;
             tokenExpiration = Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000;
             
-            // Fetch User Profile if missing
             if (!userProfile) {
               try {
                 const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -1340,7 +1279,6 @@
     }
 
     async function verifyAndRefreshGoogleToken() {
-      // If token is missing or expiring within 5 minutes, refresh silently
       if (!accessToken || Date.now() >= tokenExpiration - 300000) {
         const cid = getClientId();
         if (cid && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
@@ -1368,11 +1306,11 @@
     function closeProfileMenu() { document.getElementById('profileMenu').classList.add('hidden'); }
 
     // ----------------------------------------------------
-    // Dual-Sheet Engine: Sheet 1 (Task_Logs) & Sheet 2 (App_State)
+    // Strict Pure Spreadsheet Reader Pipeline
     // ----------------------------------------------------
     async function syncWithSpreadsheet() {
       if (!accessToken) { hideSyncLoader(); return; }
-      showSyncLoader('Reading tasks and points from spreadsheet...');
+      showSyncLoader('Reading spreadsheet data...');
       try {
         await ensureSpreadsheetExists();
         await pullStateFromSpreadsheet();
@@ -1411,7 +1349,7 @@
         }
       } catch(e) {}
 
-      // Create new two-sheet spreadsheet if none exists
+      // Create new two-sheet spreadsheet only if absolutely no file exists
       try {
         const payload = {
           properties: { title: 'Chronos Focus Logs' },
@@ -1437,42 +1375,19 @@
           body: JSON.stringify({ values: headersLogs })
         });
 
-        // Initial Key-Value ledger for Sheet 2
-        const initialAppState = [
-          ['Setting / Metric', 'Value / Configuration'],
-          ['User_Points', String(userPoints)],
-          ['Subscription_Expiry_Ms', String(subscriptionExpiry)],
-          ['Bronze_Trophies', String(bronzeTrophies)],
-          ['Silver_Trophies', String(silverTrophies)],
-          ['Golden_Trophies', String(goldenTrophies)],
-          ['Diamond_Trophy', hasDiamondTrophy ? 'TRUE' : 'FALSE'],
-          ['Streak_Days', String(dailyStreakDays)],
-          ['Bumper_Claims', String(bumperClaimCount)],
-          ['Active_Theme', activeTheme],
-          ['Custom_Wallpaper_Url', customWallpaperUrl],
-          ['Unlocked_Themes', unlockedThemes.join(',')],
-          ['Tasks_State_JSON', JSON.stringify(tasks)],
-          ['Last_Cloud_Sync', new Date().toISOString()]
-        ];
-
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B14?valueInputOption=USER_ENTERED`, {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: initialAppState })
-        });
-
         return sheetId;
       } catch(e) {
         return null;
       }
     }
 
+    // PURE GET ONLY - Reads directly from the sheet and assigns straight to memory & UI
     async function pullStateFromSpreadsheet() {
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
       if (!sheetId || !accessToken) return;
 
       try {
-        // Read Sheet 2: App_State
+        // Pure GET of Sheet 2: App_State
         const resState = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/App_State!A1:B20`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
@@ -1489,22 +1404,21 @@
             if (row && row[0]) tableMap[row[0].trim()] = (row[1] || '').trim();
           });
 
-          // Points anti-regression: Strictly adopt whichever is higher
-          const sheetPoints = parseInt(tableMap['User_Points'], 10) || 0;
-          userPoints = Math.max(userPoints, sheetPoints, highestConfirmedPoints);
-          highestConfirmedPoints = userPoints;
-
-          if (tableMap['Subscription_Expiry_Ms']) {
-            subscriptionExpiry = parseInt(tableMap['Subscription_Expiry_Ms'], 10) || 0;
-            localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
+          // DIRECT VALUE ASSIGNMENT: Exactly whatever is in the spreadsheet goes to the app
+          if (tableMap['User_Points'] !== undefined) {
+            userPoints = parseInt(tableMap['User_Points'], 10) || 0;
           }
 
-          bronzeTrophies = Math.max(bronzeTrophies, parseInt(tableMap['Bronze_Trophies'], 10) || 0);
-          silverTrophies = Math.max(silverTrophies, parseInt(tableMap['Silver_Trophies'], 10) || 0);
-          goldenTrophies = Math.max(goldenTrophies, parseInt(tableMap['Golden_Trophies'], 10) || 0);
-          if (tableMap['Diamond_Trophy'] === 'TRUE') hasDiamondTrophy = true;
-          dailyStreakDays = Math.max(dailyStreakDays, parseInt(tableMap['Streak_Days'], 10) || 0);
-          bumperClaimCount = parseInt(tableMap['Bumper_Claims'], 10) || 0;
+          if (tableMap['Subscription_Expiry_Ms'] !== undefined) {
+            subscriptionExpiry = parseInt(tableMap['Subscription_Expiry_Ms'], 10) || 0;
+          }
+
+          if (tableMap['Bronze_Trophies'] !== undefined) bronzeTrophies = parseInt(tableMap['Bronze_Trophies'], 10) || 0;
+          if (tableMap['Silver_Trophies'] !== undefined) silverTrophies = parseInt(tableMap['Silver_Trophies'], 10) || 0;
+          if (tableMap['Golden_Trophies'] !== undefined) goldenTrophies = parseInt(tableMap['Golden_Trophies'], 10) || 0;
+          if (tableMap['Diamond_Trophy'] !== undefined) hasDiamondTrophy = (tableMap['Diamond_Trophy'] === 'TRUE');
+          if (tableMap['Streak_Days'] !== undefined) dailyStreakDays = parseInt(tableMap['Streak_Days'], 10) || 0;
+          if (tableMap['Bumper_Claims'] !== undefined) bumperClaimCount = parseInt(tableMap['Bumper_Claims'], 10) || 0;
           
           if (tableMap['Active_Theme']) activeTheme = tableMap['Active_Theme'];
           if (tableMap['Custom_Wallpaper_Url']) customWallpaperUrl = tableMap['Custom_Wallpaper_Url'];
@@ -1516,14 +1430,14 @@
           if (tableMap['Tasks_State_JSON']) {
             try {
               const cloudTasks = JSON.parse(tableMap['Tasks_State_JSON']);
-              if (Array.isArray(cloudTasks) && cloudTasks.length > 0) {
+              if (Array.isArray(cloudTasks)) {
                 tasks = cloudTasks;
               }
             } catch(e) {}
           }
         }
 
-        // Reconcile individual clock durations with Sheet 1 Task_Logs today
+        // Pure GET of Sheet 1: Task_Logs to match local clocks with logged time
         try {
           const todayStr = getTodayString();
           const resLogs = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A2:G`, {
@@ -1540,20 +1454,18 @@
             });
 
             tasks.forEach(t => {
-              if (taskTotalsToday[t.title] !== undefined) {
-                // If local elapsed is significantly lower or divergent, match the logged spreadsheet time
-                if (Math.abs(t.elapsed - taskTotalsToday[t.title]) > 60 && !t.isRunning) {
-                  t.elapsed = taskTotalsToday[t.title];
-                }
+              if (taskTotalsToday[t.title] !== undefined && !t.isRunning) {
+                t.elapsed = taskTotalsToday[t.title];
               }
             });
           }
         } catch(e) {}
 
-        // Cloud read completed
-        isCloudHydrated = true;
-        saveLocalRewards();
-        saveTasksLocally();
+        // Update the screen immediately with the values from Google Sheets
+        renderTasks();
+        updateHeroMetrics();
+        updatePointsDisplay();
+        updateTrophiesDisplay();
         applyWorkspaceTheme(activeTheme, customWallpaperUrl);
         updateSubscriptionTicker();
         enforceSubscriptionCheck();
@@ -1564,19 +1476,21 @@
       }
     }
 
-    async function syncStateToSpreadsheet(force = false) {
+    // ====================================================
+    // STRICT GUARDED WRITE ROUTINES (NEVER RUN ON REFRESH)
+    // ====================================================
+    async function syncStateToSpreadsheet() {
+      // IF WRITE PERMISSION IS NOT EXPLICITLY GRANTED BY A USER TOUCH, ABORT INSTANTLY!
+      if (!WRITE_PERMISSION_GRANTED) return;
+
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
-      // Zero-write protection on startup/refresh unless user deliberately touched an action
-      if (!sheetId || !accessToken || !isCloudHydrated) return;
-      if (isStartupOrRefresh && !force) return;
-      if (isStateSyncing) return;
+      if (!sheetId || !accessToken || isStateSyncing) return;
       isStateSyncing = true;
 
       try {
-        highestConfirmedPoints = Math.max(highestConfirmedPoints, userPoints);
         const rows = [
           ['Setting / Metric', 'Value / Configuration'],
-          ['User_Points', String(highestConfirmedPoints)],
+          ['User_Points', String(userPoints)],
           ['Subscription_Expiry_Ms', String(subscriptionExpiry)],
           ['Bronze_Trophies', String(bronzeTrophies)],
           ['Silver_Trophies', String(silverTrophies)],
@@ -1603,6 +1517,8 @@
     }
 
     async function logTaskEventToSheets(taskName, eventType, sessionMins) {
+      if (!WRITE_PERMISSION_GRANTED) return;
+
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
       if (!sheetId || !accessToken || isAppendingSheetRow) return;
       isAppendingSheetRow = true;
@@ -1642,6 +1558,7 @@
     }
 
     async function flushActiveTaskCheckpoints() {
+      if (!WRITE_PERMISSION_GRANTED) return;
       const now = Date.now();
       for (const task of tasks) {
         if (task.isRunning && task.lastStarted) {
@@ -1650,9 +1567,9 @@
             const mins = (currentSec / 60).toFixed(2);
             task.elapsed += currentSec;
             task.lastStarted = now;
-            saveTasksLocally();
+            renderTasks();
             await logTaskEventToSheets(task.title, 'Active-Checkpoint', mins);
-            await syncStateToSpreadsheet(true);
+            await syncStateToSpreadsheet();
           }
         }
       }
@@ -1716,7 +1633,7 @@
           t.lastStarted = now;
         }
       });
-      saveTasksLocally();
+      renderTasks();
     }
 
     function updateHeroMetrics() {
@@ -1730,12 +1647,15 @@
       document.getElementById('slotCountBadge').textContent = `${tasks.length} / 5 slots`;
     }
 
+    // User physically presses Play/Pause -> Write permission is officially granted!
     function toggleTask(id) {
       if (!accessToken) {
         requestGoogleToken(true);
         return;
       }
-      isStartupOrRefresh = false; // Deliberate user action allows write syncing
+      
+      // USER ACTION OCCURRED: PERMISSION TO SYNC GRANTED
+      WRITE_PERMISSION_GRANTED = true;
 
       if (!isSubscriptionActive()) {
         openUsageModal(true);
@@ -1747,18 +1667,16 @@
       if (!task) return;
 
       if (!task.isRunning) {
-        // Mutual exclusivity
         tasks.forEach(t => {
           if (t.isRunning && t.id !== id) pauseTask(t.id, false);
         });
 
         task.isRunning = true;
         task.lastStarted = Date.now();
-        // Move active to top
         tasks.sort((a, b) => (b.id === id ? 1 : 0) - (a.id === id ? 1 : 0));
-        saveTasksLocally();
+        renderTasks();
         logTaskEventToSheets(task.title, 'Started', 0);
-        syncStateToSpreadsheet(true);
+        syncStateToSpreadsheet();
       } else {
         pauseTask(id, true);
       }
@@ -1774,11 +1692,11 @@
       task.isRunning = false;
       task.lastStarted = null;
 
-      saveTasksLocally();
+      renderTasks();
       if (logEvent) {
         const mins = (sessionSeconds / 60).toFixed(2);
         logTaskEventToSheets(task.title, 'Paused', mins);
-        syncStateToSpreadsheet(true);
+        syncStateToSpreadsheet();
       }
     }
 
@@ -1805,7 +1723,9 @@
         return;
       }
 
-      isStartupOrRefresh = false;
+      // USER ACTION OCCURRED: PERMISSION TO SYNC GRANTED
+      WRITE_PERMISSION_GRANTED = true;
+
       tasks.unshift({
         id: 'task_' + Date.now(),
         title: title,
@@ -1814,10 +1734,10 @@
         lastStarted: null
       });
 
-      saveTasksLocally();
+      renderTasks();
       closeNewTaskModal();
       logTaskEventToSheets(title, 'Created', 0);
-      syncStateToSpreadsheet(true);
+      syncStateToSpreadsheet();
       showToast('Task slot locked & created');
     }
 
@@ -1832,7 +1752,6 @@
           isRunning ? 'active-slot-glow bg-emerald-50/80 border-emerald-400' : 'hover:border-slate-300 shadow-xs'
         }`;
 
-        // Top Row: Permanent locked title
         const topRow = document.createElement('div');
         topRow.className = 'flex items-center justify-between gap-2 mb-2';
         topRow.innerHTML = `
@@ -1845,7 +1764,6 @@
           }">${isRunning ? 'FOCUSING' : 'IDLE'}</span>
         `;
 
-        // Analog Clock + Readout
         const clockArea = document.createElement('div');
         clockArea.className = 'my-2 flex flex-col items-center justify-center';
         clockArea.innerHTML = `
@@ -1872,7 +1790,6 @@
           }">${formatTime(task.elapsed)}</div>
         `;
 
-        // Bottom Row: Toggle Action
         const bottomRow = document.createElement('div');
         bottomRow.className = 'mt-3 pt-3 border-t border-slate-100 flex items-center justify-end';
         
@@ -1926,34 +1843,36 @@
         const pointsToAdd = totalHours - awardedHourlyPoints;
         awardedHourlyPoints = totalHours;
         userPoints += pointsToAdd;
-        highestConfirmedPoints = Math.max(highestConfirmedPoints, userPoints);
-        saveLocalRewards();
-        syncStateToSpreadsheet(true);
+        
+        if (WRITE_PERMISSION_GRANTED) {
+          syncStateToSpreadsheet();
+        }
+        updatePointsDisplay();
         triggerConsolidatedPointsPopup(pointsToAdd);
       }
 
-      // Daily Trophies: Bronze (4h), Silver (8h), Golden (15h)
+      // Daily Trophies
       if (totalHours >= 4 && !celebratedMilestonesToday.has(4)) {
         celebratedMilestonesToday.add(4);
         bronzeTrophies += 1;
-        saveLocalRewards();
-        syncStateToSpreadsheet(true);
+        if (WRITE_PERMISSION_GRANTED) syncStateToSpreadsheet();
+        updateTrophiesDisplay();
         showToast('🥉 Bronze Trophy earned! (4 Hours Focus)');
       }
 
       if (totalHours >= 8 && !celebratedMilestonesToday.has(8)) {
         celebratedMilestonesToday.add(8);
         silverTrophies += 1;
-        saveLocalRewards();
-        syncStateToSpreadsheet(true);
+        if (WRITE_PERMISSION_GRANTED) syncStateToSpreadsheet();
+        updateTrophiesDisplay();
         showToast('🥈 Silver Trophy earned! (8 Hours Focus)');
       }
 
       if (totalHours >= 15 && !celebratedMilestonesToday.has(15)) {
         celebratedMilestonesToday.add(15);
         goldenTrophies += 1;
-        saveLocalRewards();
-        syncStateToSpreadsheet(true);
+        if (WRITE_PERMISSION_GRANTED) syncStateToSpreadsheet();
+        updateTrophiesDisplay();
         showToast('🥇 Golden Trophy earned! (15 Hours Extreme Focus)');
       }
     }
@@ -1961,7 +1880,7 @@
     function triggerConsolidatedPointsPopup(pts) {
       document.getElementById('pointsEarnedTitle').textContent = `+${pts} Focus Point${pts > 1 ? 's' : ''} Earned!`;
       document.getElementById('pointsEarnedDesc').textContent =
-        `You have completed ${pts} full hour${pts > 1 ? 's' : ''} of deep focus. Points have been safely registered to your account!`;
+        `You have completed ${pts} full hour${pts > 1 ? 's' : ''} of deep focus. Points have been added to your balance!`;
       document.getElementById('pointsEarnedModal').classList.remove('hidden');
       if (typeof confetti === 'function') confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
     }
@@ -2055,12 +1974,13 @@
         goldenTrophies -= 1;
       }
 
+      WRITE_PERMISSION_GRANTED = true;
       userPoints += 100;
-      highestConfirmedPoints = Math.max(highestConfirmedPoints, userPoints);
       bumperClaimCount += 1;
 
-      saveLocalRewards();
-      syncStateToSpreadsheet(true);
+      updatePointsDisplay();
+      updateTrophiesDisplay();
+      syncStateToSpreadsheet();
       showToast('🎉 Grand Bumper Claimed! +100 Points added!');
       if (typeof confetti === 'function') confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
     }
@@ -2091,18 +2011,17 @@
         return;
       }
 
+      WRITE_PERMISSION_GRANTED = true;
       userPoints -= cost;
-      highestConfirmedPoints = userPoints; // Intentional deduction permitted
 
       const now = Date.now();
       const currentExpiry = subscriptionExpiry > now ? subscriptionExpiry : now;
       subscriptionExpiry = currentExpiry + (days * 24 * 60 * 60 * 1000);
-      localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
 
-      saveLocalRewards();
-      syncStateToSpreadsheet(true);
+      updatePointsDisplay();
       updateSubscriptionTicker();
       enforceSubscriptionCheck();
+      syncStateToSpreadsheet();
       showToast(`🎉 Redeemed! Added +${days} days to your Pro Pass.`);
     }
 
@@ -2114,8 +2033,8 @@
           showToast(`Need ${cost} points to unlock this theme`);
           return;
         }
+        WRITE_PERMISSION_GRANTED = true;
         userPoints -= cost;
-        highestConfirmedPoints = userPoints;
         unlockedThemes.push(themeKey);
         equipTheme(themeKey);
         showToast('Theme unlocked and equipped!');
@@ -2123,11 +2042,11 @@
     }
 
     function equipTheme(themeKey) {
+      WRITE_PERMISSION_GRANTED = true;
       activeTheme = themeKey;
-      saveLocalRewards();
-      syncStateToSpreadsheet(true);
       applyWorkspaceTheme(activeTheme, customWallpaperUrl);
       updateThemeButtonsInShop();
+      syncStateToSpreadsheet();
     }
 
     function updateThemeButtonsInShop() {
@@ -2163,12 +2082,12 @@
           showToast(`Need 100 points for custom wallpaper. You have ${userPoints}.`);
           return;
         }
+        WRITE_PERMISSION_GRANTED = true;
         userPoints -= 100;
-        highestConfirmedPoints = userPoints;
         unlockedThemes.push('custom_wallpaper');
-        saveLocalRewards();
-        syncStateToSpreadsheet(true);
         openDriveWallpaperModal();
+        updatePointsDisplay();
+        syncStateToSpreadsheet();
       }
     }
 
@@ -2188,12 +2107,12 @@
         return;
       }
 
+      WRITE_PERMISSION_GRANTED = true;
       customWallpaperUrl = `https://drive.google.com/thumbnail?id=${fileIdMatch[0]}&sz=w1920`;
       activeTheme = 'custom_wallpaper';
-      saveLocalRewards();
-      syncStateToSpreadsheet(true);
       applyWorkspaceTheme(activeTheme, customWallpaperUrl);
       closeDriveWallpaperModal();
+      syncStateToSpreadsheet();
       showToast('Custom Drive Wallpaper applied!');
     }
 
@@ -2215,47 +2134,11 @@
     }
 
     // ----------------------------------------------------
-    // Midnight Reset & 56-Day Diamond Streak Logic
+    // Midnight Reset
     // ----------------------------------------------------
     function getTodayString() {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
-
-    function checkMidnightReset() {
-      const today = getTodayString();
-      const lastReset = localStorage.getItem('chronos_last_reset_day');
-      if (lastReset && lastReset !== today) {
-        // Evaluate 8-hour streak condition from yesterday
-        let yesterdayTotalSeconds = 0;
-        tasks.forEach(t => { yesterdayTotalSeconds += t.elapsed; });
-        
-        if (yesterdayTotalSeconds >= 28800) { // 8 hours
-          dailyStreakDays += 1;
-          if (dailyStreakDays >= 56 && !hasDiamondTrophy) {
-            hasDiamondTrophy = true;
-            showToast('💎 UNBELIEVABLE: Diamond Trophy Achieved for 56-day Streak!');
-          }
-        } else {
-          dailyStreakDays = 0; // Streak broken
-        }
-
-        // Reset daily timers
-        tasks.forEach(t => {
-          t.elapsed = 0;
-          t.isRunning = false;
-          t.lastStarted = null;
-        });
-
-        awardedHourlyPoints = 0;
-        celebratedMilestonesToday.clear();
-
-        saveTasksLocally();
-        saveLocalRewards();
-        syncStateToSpreadsheet(true);
-        showToast('🌙 Midnight Reset: Daily timers refreshed!');
-      }
-      localStorage.setItem('chronos_last_reset_day', today);
     }
 
     function updateCountdownToMidnight() {
@@ -2353,21 +2236,21 @@
         return;
       }
 
+      WRITE_PERMISSION_GRANTED = true;
       const now = Date.now();
       const currentExpiry = subscriptionExpiry > now ? subscriptionExpiry : now;
       subscriptionExpiry = currentExpiry + (pendingPurchaseDays * 24 * 60 * 60 * 1000);
-      localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
 
       closePlanCodeModal();
       closeUsageModal();
-      syncStateToSpreadsheet(true);
+      syncStateToSpreadsheet();
       updateSubscriptionTicker();
       enforceSubscriptionCheck();
       showToast(`🎉 Plan activated! Added +${pendingPurchaseDays} days of focus.`);
     }
 
     // ----------------------------------------------------
-    // Audio / Anti-Throttle & Wake Lock Support
+    // Anti-Throttle & Wake Lock Support
     // ----------------------------------------------------
     async function activateWakeLock() {
       try {
@@ -2456,7 +2339,7 @@
     });
 
     // ----------------------------------------------------
-    // Analytics Dashboard
+    // Analytics Dashboard (Read-Only)
     // ----------------------------------------------------
     async function openAnalyticsDashboardModal() {
       if (!accessToken) { requestGoogleToken(true); return; }

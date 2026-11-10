@@ -769,6 +769,34 @@
     </div>
   </div>
 
+  <!-- New Task Name Creation Modal (Permanent Naming - No Edit/Delete After) -->
+  <div id="newTaskModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
+      <div class="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center text-2xl shadow-sm mb-3">
+        <i class="fa-solid fa-tag"></i>
+      </div>
+      <h4 class="text-base font-black text-slate-900">Name Your Focus Task</h4>
+      <p class="text-xs text-slate-500 mt-1 mb-4">
+        Once created, task names are permanently locked to preserve your tracked history.
+      </p>
+
+      <div class="mb-4 text-left">
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Task Title</label>
+        <input type="text" id="newTaskTitleInput" placeholder="e.g. Deep Work, Learning Spanish" maxlength="50" class="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500 font-semibold text-slate-800" />
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="closeNewTaskModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold text-xs hover:bg-slate-200 transition">
+          Cancel
+        </button>
+        <button onclick="confirmCreateNewTask()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/25 transition">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Create Task</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Clear All Data Confirmation Modal -->
   <div id="clearConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 hidden">
     <div class="bg-white rounded-3xl max-w-xs w-full p-5 text-center shadow-2xl border border-slate-100 fade-enter">
@@ -1520,15 +1548,20 @@
       const minHand = document.getElementById(`${clockContainerId}-min`);
       const hourHand = document.getElementById(`${clockContainerId}-hour`);
 
-      if (!secHand) return;
-      const s = secondsTotal % 60;
-      const m = (secondsTotal / 60) % 60;
-      const h = (secondsTotal / 3600) % 12;
+      if (!secHand && !minHand && !hourHand) return;
+      const totalSec = Math.max(0, secondsTotal);
+      const s = totalSec % 60;
+      const m = (totalSec / 60) % 60;
+      const h = (totalSec / 3600) % 12;
 
-      // Direct SVG transform rotation around central pivot (50, 50) without CSS transitions
-      secHand.setAttribute('transform', `rotate(${(s * 6).toFixed(1)} 50 50)`);
-      if (minHand) minHand.setAttribute('transform', `rotate(${(m * 6).toFixed(1)} 50 50)`);
-      if (hourHand) hourHand.setAttribute('transform', `rotate(${(h * 30 + m * 0.5).toFixed(1)} 50 50)`);
+      // Clean trigonometric angle calculation with fixed 50 50 center
+      const secAngle = s * 6;
+      const minAngle = m * 6 + s * 0.1;
+      const hourAngle = h * 30 + m * 0.5;
+
+      if (secHand) secHand.setAttribute('transform', `rotate(${secAngle.toFixed(2)}, 50, 50)`);
+      if (minHand) minHand.setAttribute('transform', `rotate(${minAngle.toFixed(2)}, 50, 50)`);
+      if (hourHand) hourHand.setAttribute('transform', `rotate(${hourAngle.toFixed(2)}, 50, 50)`);
     }
 
     function tickTimers() {
@@ -1542,7 +1575,7 @@
           const el = document.getElementById(`timer-${task.id}`);
           if (el) el.textContent = formatTime(currentTotalSeconds);
 
-          // Update clock hands on active card
+          // Update clock hands smoothly on active card
           updateClockHands(`clock-${task.id}`, currentTotalSeconds);
         }
       });
@@ -1613,11 +1646,6 @@
       if (!task.isRunning) {
         if (isInvalidTitle(task.title)) {
           showToast(`⚠️ Please name this task before starting!`);
-          const inputEl = document.getElementById(`title-input-${id}`);
-          if (inputEl) {
-            inputEl.focus();
-            inputEl.select();
-          }
           return;
         }
 
@@ -1670,52 +1698,46 @@
       }
     }
 
-    function handleTitleChange(id, newTitle) {
-      if (!requireAuth()) return;
-      const task = tasks.find(t => t.id === id);
-      if (!task) return;
-      const cleaned = newTitle.trim().slice(0, 50);
-
-      if (task.title !== cleaned && cleaned.length > 0) {
-        logTaskEventToSheets(task.title, 'Renamed-Archived', (task.elapsed / 60).toFixed(2));
-        task.title = cleaned;
-        task.elapsed = 0;
-        saveTasks();
-        logTaskEventToSheets(cleaned, 'Created', 0);
-      }
-    }
-
+    // Modal for permanent task creation (No edit, no delete)
     function addNewSlot() {
       if (!requireAuth()) return;
       if (tasks.length >= 5) {
         showToast('Maximum 5 focus slots allowed');
         return;
       }
+      const titleInput = document.getElementById('newTaskTitleInput');
+      titleInput.value = '';
+      document.getElementById('newTaskModal').classList.remove('hidden');
+      setTimeout(() => titleInput.focus(), 150);
+    }
+
+    function closeNewTaskModal() {
+      document.getElementById('newTaskModal').classList.add('hidden');
+    }
+
+    function confirmCreateNewTask() {
+      const titleInput = document.getElementById('newTaskTitleInput');
+      const title = titleInput.value.trim().slice(0, 50);
+
+      if (isInvalidTitle(title)) {
+        showToast('Please enter a descriptive, non-default task title.');
+        titleInput.focus();
+        return;
+      }
+
       const newId = 'task_' + Date.now();
       tasks.unshift({
         id: newId,
-        title: '',
+        title: title,
         elapsed: 0,
         isRunning: false,
         lastStarted: null
       });
-      saveTasks();
 
-      setTimeout(() => {
-        const input = document.getElementById(`title-input-${newId}`);
-        if (input) {
-          input.focus();
-          showToast('Name your task to begin!');
-        }
-      }, 100);
-    }
-
-    function deleteTask(id) {
-      const t = tasks.find(x => x.id === id);
-      if (t && t.isRunning) pauseTask(id, false);
-      tasks = tasks.filter(x => x.id !== id);
       saveTasks();
-      showToast('Slot removed');
+      closeNewTaskModal();
+      logTaskEventToSheets(title, 'Created', 0);
+      showToast(`Task "${title}" created and permanently locked.`);
     }
 
     // ----------------------------------------------------
@@ -1769,7 +1791,7 @@
     }
 
     // ----------------------------------------------------
-    // Upgraded UI Cards with Glitch-Free Analog Clock Faces
+    // Upgraded UI Cards with Glitch-Free Analog Clock Faces (No Edit / Delete)
     // ----------------------------------------------------
     function renderTasks() {
       const grid = document.getElementById('taskGrid');
@@ -1777,41 +1799,32 @@
 
       tasks.forEach((task) => {
         const isRunning = task.isRunning;
-        const needsName = isInvalidTitle(task.title);
 
         const card = document.createElement('div');
         card.className = `glass-panel rounded-3xl p-5 transition-all duration-300 relative flex flex-col justify-between ${
           isRunning ? 'active-slot-glow bg-emerald-50/80 border-emerald-400' : 'hover:border-slate-300 shadow-xs'
         }`;
 
-        // Top info row
+        // Top info row: Permanent Title + Fixed Lock Tag (No Edit / Delete)
         const topRow = document.createElement('div');
         topRow.className = 'flex items-center justify-between gap-2 mb-2';
 
-        const titleInput = document.createElement('input');
-        titleInput.type = 'text';
-        titleInput.id = `title-input-${task.id}`;
-        titleInput.value = task.title;
-        titleInput.placeholder = 'Name this task...';
-        titleInput.className = `text-sm font-extrabold bg-transparent border-b ${
-          needsName ? 'border-amber-400 text-amber-700' : 'border-transparent hover:border-slate-300 focus:border-brand-500'
-        } focus:outline-none py-0.5 px-1 w-full truncate transition`;
-        titleInput.onblur = (e) => handleTitleChange(task.id, e.target.value);
-        titleInput.onkeydown = (e) => { if (e.key === 'Enter') e.target.blur(); };
+        const titleEl = document.createElement('h3');
+        titleEl.className = 'text-sm font-extrabold text-slate-800 truncate py-0.5 px-1';
+        titleEl.textContent = task.title;
 
-        const delBtn = document.createElement('button');
-        delBtn.className = 'text-slate-300 hover:text-rose-500 text-xs p-1.5 transition rounded-lg hover:bg-rose-50';
-        delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-        delBtn.onclick = () => deleteTask(task.id);
+        const lockedBadge = document.createElement('span');
+        lockedBadge.className = 'text-[10px] font-bold text-slate-400 flex items-center gap-1 flex-shrink-0 bg-slate-100 px-2 py-0.5 rounded-full';
+        lockedBadge.innerHTML = '<i class="fa-solid fa-lock text-[9px]"></i><span>Locked</span>';
 
-        topRow.appendChild(titleInput);
-        topRow.appendChild(delBtn);
+        topRow.appendChild(titleEl);
+        topRow.appendChild(lockedBadge);
 
         // Visual Analog Clock Face & Digital Readout
         const clockArea = document.createElement('div');
         clockArea.className = 'my-3 flex flex-col items-center justify-center';
 
-        // SVG Clock Dial with glitch-free line coordinates
+        // SVG Clock Dial with rock-solid center coordinates (50, 50)
         const svgClock = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svgClock.setAttribute('viewBox', '0 0 100 100');
         svgClock.setAttribute('class', `w-20 h-20 mb-2 drop-shadow-sm ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform`);
@@ -1820,16 +1833,18 @@
           <!-- Dial Base -->
           <circle cx="50" cy="50" r="46" fill="${isRunning ? '#f0fdf4' : '#ffffff'}" stroke="${isRunning ? '#34d399' : '#e2e8f0'}" stroke-width="4"/>
           <!-- Hour Ticks -->
-          <line x1="50" y1="10" x2="50" y2="15" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="90" y1="50" x2="85" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="50" y1="90" x2="50" y2="85" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="10" y1="50" x2="15" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-          <!-- Hands -->
-          <line id="clock-${task.id}-hour" class="clock-hand" x1="50" y1="50" x2="50" y2="28" stroke="${isRunning ? '#065f46' : '#334155'}" stroke-width="4" stroke-linecap="round"/>
-          <line id="clock-${task.id}-min" class="clock-hand" x1="50" y1="50" x2="50" y2="18" stroke="${isRunning ? '#10b981' : '#64748b'}" stroke-width="2.5" stroke-linecap="round"/>
-          <line id="clock-${task.id}-sec" class="clock-hand" x1="50" y1="50" x2="50" y2="15" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/>
-          <!-- Center Pin -->
-          <circle cx="50" cy="50" r="4" fill="${isRunning ? '#059669' : '#475569'}"/>
+          <line x1="50" y1="9" x2="50" y2="15" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="91" y1="50" x2="85" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="50" y1="91" x2="50" y2="85" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="9" y1="50" x2="15" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Hands rotating from center point (50, 50) -->
+          <g>
+            <line id="clock-${task.id}-hour" class="clock-hand" x1="50" y1="50" x2="50" y2="28" stroke="${isRunning ? '#065f46' : '#334155'}" stroke-width="4" stroke-linecap="round"/>
+            <line id="clock-${task.id}-min" class="clock-hand" x1="50" y1="50" x2="50" y2="18" stroke="${isRunning ? '#10b981' : '#64748b'}" stroke-width="2.5" stroke-linecap="round"/>
+            <line id="clock-${task.id}-sec" class="clock-hand" x1="50" y1="50" x2="50" y2="14" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/>
+            <!-- Center Pin -->
+            <circle cx="50" cy="50" r="4" fill="${isRunning ? '#059669' : '#475569'}"/>
+          </g>
         `;
 
         const timerText = document.createElement('div');
@@ -1891,7 +1906,7 @@
     }
 
     // ----------------------------------------------------
-    // Unified Multi-Device Drive & Sheets Discovery Engine
+    // Unified Multi-Device Drive & Sheets Discovery Engine (Safe Continuity - No Overwrites)
     // ----------------------------------------------------
     async function syncWithDriveAndSheets() {
       if (!accessToken) return;
@@ -1916,6 +1931,9 @@
           if (meta && !meta.trashed && meta.id) {
             await pullDataFromDriveJson(meta.id);
             return meta.id;
+          } else {
+            // Dead or trashed link: remove outdated link
+            localStorage.removeItem(STORAGE_KEY_DRIVE_FILE_ID);
           }
         } catch (e) {}
       }
@@ -1923,19 +1941,20 @@
       // 2. Query Drive for existing non-trashed chronos_task_data.json
       try {
         const query = encodeURIComponent("name = 'chronos_task_data.json' and trashed = false");
-        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed)&orderBy=modifiedTime desc`, {
+        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed,modifiedTime)&orderBy=modifiedTime desc`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const data = await searchRes.json();
         if (data.files && data.files.length > 0) {
           driveFileId = data.files[0].id;
           localStorage.setItem(STORAGE_KEY_DRIVE_FILE_ID, driveFileId);
+          // Always adopt existing data from cloud JSON without erasing
           await pullDataFromDriveJson(driveFileId);
           return driveFileId;
         }
       } catch (e) {}
 
-      // 3. Create fresh chronos_task_data.json in Drive if no file exists
+      // 3. Create fresh chronos_task_data.json in Drive only if no file exists
       try {
         const meta = { name: 'chronos_task_data.json', mimeType: 'application/json' };
         const payload = JSON.stringify({
@@ -1976,9 +1995,12 @@
 
         let stateChanged = false;
 
-        // Adopt linked spreadsheet ID from cloud JSON if current device doesn't have one
-        if (data.spreadsheetId && !localStorage.getItem(STORAGE_KEY_SHEET_ID)) {
-          localStorage.setItem(STORAGE_KEY_SHEET_ID, data.spreadsheetId);
+        // Adopt spreadsheet link from cloud JSON or update outdated one
+        if (data.spreadsheetId) {
+          const currentLocalSheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
+          if (currentLocalSheetId !== data.spreadsheetId) {
+            localStorage.setItem(STORAGE_KEY_SHEET_ID, data.spreadsheetId);
+          }
         }
 
         // Adopt subscription if cloud has higher validity
@@ -1989,9 +2011,16 @@
           enforceSubscriptionCheck();
         }
 
-        // Adopt task state if local tasks are empty
-        if (Array.isArray(data.tasks) && data.tasks.length > 0 && tasks.length === 0) {
-          tasks = data.tasks;
+        // Safely adopt cloud tasks so home screen updates with the current JSON file
+        if (Array.isArray(data.tasks)) {
+          // Keep active running state if local was already running
+          const currentlyRunningId = tasks.find(t => t.isRunning)?.id;
+          tasks = data.tasks.map(t => {
+            if (t.id === currentlyRunningId) {
+              return { ...t, isRunning: true, lastStarted: Date.now() };
+            }
+            return { ...t, isRunning: false, lastStarted: null };
+          });
           localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
           stateChanged = true;
         }
@@ -2046,13 +2075,16 @@
           });
           const meta = await res.json();
           if (meta && !meta.trashed && meta.id) return sheetId;
+          // Obsolete or trashed link: remove from storage
+          localStorage.removeItem(STORAGE_KEY_SHEET_ID);
+          sheetId = null;
         } catch(e) {}
       }
 
       // Step 2: Search Drive for any non-trashed spreadsheet named 'Chronos Focus Logs'
       try {
         const query = encodeURIComponent("name = 'Chronos Focus Logs' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
-        const searchSheetRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed)&orderBy=modifiedTime desc`, {
+        const searchSheetRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed,modifiedTime)&orderBy=modifiedTime desc`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const sheetSearchResults = await searchSheetRes.json();

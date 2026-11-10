@@ -1848,9 +1848,11 @@
       if (!accessToken || isSyncingToDrive) return;
       isSyncingToDrive = true;
       try {
+        const currentSheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID) || null;
         const content = JSON.stringify({
           updatedAt: new Date().toISOString(),
           subscriptionExpiry: subscriptionExpiry,
+          spreadsheetId: currentSheetId,
           tasks: tasks
         });
 
@@ -1867,10 +1869,14 @@
               headers: { Authorization: `Bearer ${accessToken}` }
             });
             const existingJson = await existingFileRes.json();
-            if (existingJson && existingJson.subscriptionExpiry) {
-              if (existingJson.subscriptionExpiry > subscriptionExpiry) {
+            if (existingJson) {
+              if (existingJson.subscriptionExpiry && existingJson.subscriptionExpiry > subscriptionExpiry) {
                 subscriptionExpiry = existingJson.subscriptionExpiry;
                 localStorage.setItem(STORAGE_KEY_SUBSCRIPTION, subscriptionExpiry.toString());
+              }
+              // If current device lacks sheet ID or drive has an active sheet ID, adopt it
+              if (existingJson.spreadsheetId && !localStorage.getItem(STORAGE_KEY_SHEET_ID)) {
+                localStorage.setItem(STORAGE_KEY_SHEET_ID, existingJson.spreadsheetId);
               }
             }
           } catch(e) {}
@@ -1878,6 +1884,7 @@
           const payloadContent = JSON.stringify({
             updatedAt: new Date().toISOString(),
             subscriptionExpiry: subscriptionExpiry,
+            spreadsheetId: localStorage.getItem(STORAGE_KEY_SHEET_ID) || currentSheetId,
             tasks: tasks
           });
 
@@ -1908,6 +1915,7 @@
       if (!accessToken) return null;
       let sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
 
+      // Step 1: If an ID is cached locally, verify it's still alive and not trashed
       if (sheetId) {
         try {
           const res = await fetch(`https://www.googleapis.com/drive/v3/files/${sheetId}?fields=id,trashed`, {
@@ -1918,6 +1926,49 @@
         } catch(e) {}
       }
 
+      // Step 2: Cross-Device Check - Inspect Drive for chronos_task_data.json
+      try {
+        const driveDataRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=name='chronos_task_data.json'+and+trashed=false`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const driveData = await driveDataRes.json();
+        if (driveData.files && driveData.files.length > 0) {
+          const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveData.files[0].id}?alt=media`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          const cloudConfig = await fileRes.json();
+          if (cloudConfig && cloudConfig.spreadsheetId) {
+            // Verify this spreadsheet ID is valid and not trashed
+            const sheetCheckRes = await fetch(`https://www.googleapis.com/drive/v3/files/${cloudConfig.spreadsheetId}?fields=id,trashed`, {
+              headers: { Authorization: `Bearer ${accessToken}` }
+            });
+            const sheetMeta = await sheetCheckRes.json();
+            if (sheetMeta && !sheetMeta.trashed && sheetMeta.id) {
+              sheetId = sheetMeta.id;
+              localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
+              return sheetId;
+            }
+          }
+        }
+      } catch(e) {}
+
+      // Step 3: Search Drive directly by name for existing 'Chronos Focus Logs' spreadsheet
+      try {
+        const query = encodeURIComponent("name = 'Chronos Focus Logs' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
+        const searchSheetRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,trashed)`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const sheetSearchResults = await searchSheetRes.json();
+        if (sheetSearchResults.files && sheetSearchResults.files.length > 0) {
+          sheetId = sheetSearchResults.files[0].id;
+          localStorage.setItem(STORAGE_KEY_SHEET_ID, sheetId);
+          syncToDrive(); // propagate found sheetId back to Drive JSON
+          return sheetId;
+        }
+      } catch(e) {}
+
+      // Step 4: If and only if no spreadsheet exists anywhere in the user's Drive, create a new one
       try {
         const payload = {
           properties: { title: 'Chronos Focus Logs' },
@@ -1938,6 +1989,9 @@
           headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ values: headers })
         });
+
+        // Immediately update Drive JSON with the new spreadsheet ID
+        syncToDrive();
 
         return sheetId;
       } catch(e) {
@@ -2259,7 +2313,7 @@
       cachedAnalyticsRows = null;
       lastAnalyticsFetchTime = 0;
 
-      // 2. Wipe Google Drive JSON content while strictly preserving subscriptionExpiry
+      // 2. Wipe Google Drive JSON content while strictly preserving subscriptionExpiry and spreadsheetId
       if (accessToken) {
         try {
           const searchRes = await fetch(
@@ -2272,6 +2326,7 @@
             const preservedPayload = JSON.stringify({
               updatedAt: new Date().toISOString(),
               subscriptionExpiry: subscriptionExpiry,
+              spreadsheetId: localStorage.getItem(STORAGE_KEY_SHEET_ID) || null,
               tasks: []
             });
             await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {

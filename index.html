@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Chronos - Focus & Task Tracker</title>
   
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   
   <!-- Web App Manifest -->
-  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Chronos%20Task%20Tracker%22%2C%22short_name%22%3A%22Chronos%22%2C%22description%22%3A%22High-performance%20focus%20and%20task%20time%20tracker%22%2C%22id%22%3A%22chronos-task-tracker%22%2C%22start_url%22%3A%22.%22%2C%22scope%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22orientation%22%3A%22portrait-primary%22%2C%22background-color%22%3A%22%23f8fafc%22%2C%22theme_color%22%3A%22%232563eb%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fplacehold.co%2F192x192%2F2563eb%2Fffffff.png%3Ftext%3DC%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fpng%22%2C%22purpose%22%3A%22any%20maskable%22%7D%2C%7B%22src%22%3A%22https%3A%2F%2Fplacehold.co%2F512x512%2F2563eb%2Fffffff.png%3Ftext%3DC%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D" />
+  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Chronos%20Task%20Tracker%22%2C%22short_name%22%3A%22Chronos%22%2C%22description%22%3A%22High-performance%20focus%20and%20task%20time%20tracker%22%2C%22id%22%3A%22chronos-task-tracker%22%2C%22start_url%22%3A%22.%22%2C%22scope%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22orientation%22%3A%22portrait-primary%22%2C%22background-color%22%3A%22%23f8fafc%22%2C%22theme_color%22%3A%22%232563eb%22%7D" />
   <meta name="theme-color" content="#2563eb" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <!-- Google Fonts & FontAwesome -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -55,6 +55,8 @@
     * {
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      touch-action: manipulation;
+      box-sizing: border-box;
     }
 
     body {
@@ -62,6 +64,7 @@
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
       transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s ease;
+      padding-bottom: env(safe-area-inset-bottom, 20px);
     }
     
     #bubbleCanvas {
@@ -88,40 +91,36 @@
     }
 
     .glass-panel {
-      background: rgba(255, 255, 255, 0.88);
+      background: rgba(255, 255, 255, 0.94);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(226, 232, 240, 0.85);
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .glass-panel:hover {
-      border-color: rgba(203, 213, 225, 0.95);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .active-slot-glow {
-      box-shadow: 0 16px 36px -8px rgba(16, 185, 129, 0.35), 0 8px 16px -6px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 12px 30px -6px rgba(16, 185, 129, 0.32), 0 4px 12px -4px rgba(16, 185, 129, 0.18);
       border-color: rgba(52, 211, 153, 0.95) !important;
       animation: floatGentle 3.5s ease-in-out infinite alternate;
     }
 
     .active-rest-glow {
-      box-shadow: 0 16px 36px -8px rgba(245, 158, 11, 0.35), 0 8px 16px -6px rgba(245, 158, 11, 0.2);
+      box-shadow: 0 12px 30px -6px rgba(245, 158, 11, 0.32), 0 4px 12px -4px rgba(245, 158, 11, 0.18);
       border-color: rgba(251, 191, 36, 0.95) !important;
       animation: floatGentle 3.5s ease-in-out infinite alternate;
     }
 
     @keyframes floatGentle {
       0% { transform: translateY(0px); }
-      100% { transform: translateY(-4px); }
+      100% { transform: translateY(-3px); }
     }
 
     .fade-enter {
-      animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: fadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.96) translateY(6px); }
+      from { opacity: 0; transform: scale(0.97) translateY(4px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
     }
 
@@ -139,7 +138,7 @@
       color: #f1f5f9 !important;
     }
     body.theme-midnight .glass-panel {
-      background: rgba(15, 23, 42, 0.88) !important;
+      background: rgba(15, 23, 42, 0.92) !important;
       border-color: rgba(51, 65, 85, 0.75) !important;
       color: #f1f5f9 !important;
     }
@@ -149,22 +148,16 @@
       color: #f0fdf4 !important;
     }
     body.theme-forest .glass-panel {
-      background: rgba(6, 44, 30, 0.88) !important;
+      background: rgba(6, 44, 30, 0.92) !important;
       border-color: rgba(16, 185, 129, 0.35) !important;
       color: #f0fdf4 !important;
     }
 
-    .usage-light-bg {
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.96) 100%);
-      border: 1px solid rgba(226, 232, 240, 0.9);
-      box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.15);
-    }
-
     button:active {
-      transform: scale(0.97);
+      transform: scale(0.96);
     }
     button {
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     }
   </style>
 </head>
@@ -174,60 +167,60 @@
   <div id="wallpaperBackdrop"></div>
   <canvas id="bubbleCanvas"></canvas>
 
-  <!-- Reconnect Floating Notification Bar -->
-  <div id="reconnectBanner" class="fixed top-3 left-1/2 -translate-x-1/2 z-[55] w-[92%] max-w-lg bg-slate-900/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center justify-between gap-3 hidden fade-enter">
+  <!-- Reconnect Floating Notification Bar (Mobile & Desktop) -->
+  <div id="reconnectBanner" class="fixed top-3 left-1/2 -translate-x-1/2 z-[75] w-[92%] max-w-md bg-slate-900/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center justify-between gap-3 hidden fade-enter">
     <div class="flex items-center gap-2.5 min-w-0">
       <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0"></span>
-      <p class="text-xs font-semibold truncate">Google token refreshing. Click to confirm sync.</p>
+      <p class="text-xs font-semibold truncate">Google session expired. Tap to reconnect.</p>
     </div>
-    <button onclick="requestGoogleToken(true)" class="px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition flex-shrink-0">
+    <button onclick="requestGoogleToken(true)" class="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition flex-shrink-0">
       <i class="fa-solid fa-arrows-rotate text-[10px]"></i>
-      <span>Refresh Sync</span>
+      <span>Reconnect</span>
     </button>
   </div>
 
   <!-- Main Container -->
-  <div class="relative z-10 flex-grow flex flex-col max-w-5xl mx-auto w-full px-4 sm:px-6 py-4 sm:py-6 pb-20">
+  <div class="relative z-10 flex-grow flex flex-col max-w-5xl mx-auto w-full px-3 sm:px-6 py-3 sm:py-6">
     
-    <!-- Top Bar -->
-    <header class="flex items-center justify-between pb-3.5 border-b border-slate-200/80 mb-5">
+    <!-- Top Bar (Desktop & Mobile Unified Header) -->
+    <header class="flex items-center justify-between pb-3 sm:pb-3.5 border-b border-slate-200/80 mb-3.5 sm:mb-5">
       
       <!-- Left: Hamburger Menu & Branding -->
-      <div class="flex items-center gap-3">
-        <button onclick="toggleNavDrawer()" class="w-10 h-10 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-700 transition shadow-xs hover:shadow-sm" aria-label="Open Workspace Menu">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button onclick="toggleNavDrawer()" class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-700 transition shadow-xs active:scale-95" aria-label="Open Workspace Menu">
           <i class="fa-solid fa-bars text-sm"></i>
         </button>
 
-        <div class="flex items-center gap-2.5">
-          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-brand-500/25">
-            <i class="fa-solid fa-stopwatch text-lg"></i>
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-brand-500/25">
+            <i class="fa-solid fa-stopwatch text-sm sm:text-lg"></i>
           </div>
           <div>
-            <h1 class="text-base sm:text-lg font-black tracking-tight text-slate-900 leading-none">Chronos</h1>
-            <p class="text-[10px] font-semibold text-slate-400 mt-1">Focus Workspace</p>
+            <h1 class="text-sm sm:text-lg font-black tracking-tight text-slate-900 leading-none">Chronos</h1>
+            <p class="text-[9px] sm:text-[10px] font-semibold text-slate-400 mt-0.5 sm:mt-1">Focus Workspace</p>
           </div>
         </div>
       </div>
 
       <!-- Right: Points Pill + Trophy Pill + Avatar -->
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1.5 sm:gap-2">
         
         <!-- Live Chronos Points Pill -->
-        <button onclick="openShopModal()" class="flex items-center gap-2 px-3 py-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/90 transition shadow-xs group" title="Focus Points & Rewards Shop">
+        <button onclick="openShopModal()" class="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/90 transition shadow-xs group" title="Focus Points & Rewards Shop">
           <i class="fa-solid fa-coins text-amber-500 text-xs group-hover:rotate-12 transition-transform"></i>
           <span id="headerPointsCount" class="text-xs font-black font-mono">0</span>
-          <span class="text-[10px] font-bold uppercase tracking-wider hidden sm:inline text-amber-700">PTS</span>
+          <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hidden sm:inline text-amber-700">PTS</span>
         </button>
 
         <!-- Live Trophy Collection Pill in Header -->
-        <button onclick="openTrophyModal()" class="flex items-center gap-1.5 px-2.5 py-2 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200/90 transition shadow-xs group" title="Trophy Hall & Streaks">
+        <button onclick="openTrophyModal()" class="flex items-center gap-1.5 px-2.5 py-1.5 sm:py-2 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200/90 transition shadow-xs group" title="Trophy Hall & Streaks">
           <i class="fa-solid fa-trophy text-purple-600 text-xs group-hover:scale-110 transition-transform"></i>
           <span id="headerTrophyCount" class="text-xs font-black font-mono">0</span>
         </button>
 
         <!-- Google Profile Button -->
         <div class="relative">
-          <button id="authAvatarBtn" class="w-10 h-10 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 flex items-center justify-center overflow-hidden transition shadow-xs" onclick="handleAuthButtonClick()" aria-label="Google Account">
+          <button id="authAvatarBtn" class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 flex items-center justify-center overflow-hidden transition shadow-xs" onclick="handleAuthButtonClick()" aria-label="Google Account">
             <svg id="googleGIcon" class="w-4 h-4" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -320,66 +313,66 @@
       </div>
 
       <div class="pt-4 border-t border-slate-100 text-center">
-        <p class="text-[11px] font-medium text-slate-400">Chronos Focus Engine &bull; Strictly Cloud Authoritative</p>
+        <p class="text-[11px] font-medium text-slate-400">Chronos Focus Engine &bull; Non-Stop Sync</p>
       </div>
     </aside>
 
     <!-- Command Center / Dashboard Widget (4 Cards: Focus, Total Today, Midnight Reset, Analytics) -->
-    <div class="glass-panel p-3 sm:p-3.5 rounded-3xl shadow-sm border border-slate-200/90 mb-5">
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+    <div class="glass-panel p-2.5 sm:p-3.5 rounded-3xl shadow-sm border border-slate-200/90 mb-3.5 sm:mb-5">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
         
         <!-- Productive Focus Time (Meets Trophy/Points Quota) -->
-        <div class="bg-white/95 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
-          <div class="flex items-center justify-between mb-1.5">
-            <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xs shadow-2xs">
+        <div class="bg-white/95 rounded-2xl p-2.5 sm:p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
+          <div class="flex items-center justify-between mb-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xs shadow-2xs">
               <i class="fa-solid fa-brain"></i>
             </div>
-            <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 uppercase tracking-wider">Trophies</span>
+            <span class="text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 uppercase tracking-wider">Trophies</span>
           </div>
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Focus Time</span>
-            <p id="heroFocusTime" class="text-base sm:text-lg font-black font-mono text-slate-900 leading-tight">00:00:00</p>
+            <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Focus Time</span>
+            <p id="heroFocusTime" class="text-sm sm:text-lg font-black font-mono text-slate-900 leading-tight">00:00:00</p>
           </div>
         </div>
 
         <!-- Today's Total Time (Includes Timepass + Rest) -->
-        <div class="bg-white/95 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
-          <div class="flex items-center justify-between mb-1.5">
-            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shadow-2xs">
+        <div class="bg-white/95 rounded-2xl p-2.5 sm:p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
+          <div class="flex items-center justify-between mb-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shadow-2xs">
               <i class="fa-solid fa-clock"></i>
             </div>
-            <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 uppercase tracking-wider">All Tasks</span>
+            <span class="text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 uppercase tracking-wider">All Tasks</span>
           </div>
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Today's Time</span>
-            <p id="heroTotalTime" class="text-base sm:text-lg font-black font-mono text-emerald-700 leading-tight">00:00:00</p>
+            <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Today's Time</span>
+            <p id="heroTotalTime" class="text-sm sm:text-lg font-black font-mono text-emerald-700 leading-tight">00:00:00</p>
           </div>
         </div>
 
         <!-- Midnight Reset Countdown -->
-        <div class="bg-white/95 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
-          <div class="flex items-center justify-between mb-1.5">
-            <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xs shadow-2xs">
+        <div class="bg-white/95 rounded-2xl p-2.5 sm:p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
+          <div class="flex items-center justify-between mb-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xs shadow-2xs">
               <i class="fa-solid fa-hourglass-half"></i>
             </div>
-            <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 uppercase tracking-wider">Auto 00:00</span>
+            <span class="text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 uppercase tracking-wider">Auto 00:00</span>
           </div>
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Reset In</span>
-            <p id="heroResetCountdown" class="text-base sm:text-lg font-black font-mono text-amber-600 leading-tight">--:--:--</p>
+            <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Reset In</span>
+            <p id="heroResetCountdown" class="text-sm sm:text-lg font-black font-mono text-amber-600 leading-tight">--:--:--</p>
           </div>
         </div>
 
         <!-- Visual Analytics Dashboard Trigger -->
-        <div class="bg-gradient-to-tr from-indigo-50/90 to-purple-50/90 rounded-2xl p-3 border border-indigo-100/90 flex flex-col justify-between shadow-2xs cursor-pointer hover:border-indigo-300 transition group" onclick="openAnalyticsDashboardModal()">
-          <div class="flex items-center justify-between mb-1.5">
-            <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xs group-hover:scale-105 transition shadow-xs">
+        <div class="bg-gradient-to-tr from-indigo-50/90 to-purple-50/90 rounded-2xl p-2.5 sm:p-3 border border-indigo-100/90 flex flex-col justify-between shadow-2xs cursor-pointer hover:border-indigo-300 transition group active:scale-95" onclick="openAnalyticsDashboardModal()">
+          <div class="flex items-center justify-between mb-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xs group-hover:scale-105 transition shadow-xs">
               <i class="fa-solid fa-chart-pie"></i>
             </div>
             <i class="fa-solid fa-arrow-right text-indigo-400 text-xs group-hover:translate-x-1 transition-transform"></i>
           </div>
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-500 block">Insights</span>
+            <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-indigo-500 block">Insights</span>
             <p class="text-xs font-bold text-slate-800 truncate">Dashboard</p>
           </div>
         </div>
@@ -389,17 +382,17 @@
 
     <!-- Focus Task Slots Section -->
     <main class="flex-grow">
-      <div class="flex items-center justify-between mb-3 px-1">
+      <div class="flex items-center justify-between mb-2 px-1">
         <h2 class="text-xs font-black uppercase tracking-wider text-slate-400">Focus Task Slots (Max 5)</h2>
         <span id="slotCountBadge" class="text-[11px] font-bold text-slate-400 font-mono">0 / 5 slots</span>
       </div>
 
-      <div id="taskGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div id="taskGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <!-- Rendered dynamically -->
       </div>
     </main>
 
-    <footer class="mt-8 text-center text-slate-400 text-[11px] py-2">
+    <footer class="mt-5 sm:mt-8 text-center text-slate-400 text-[11px] py-2">
       Chronos Focus &bull; Pure Cloud Sync &bull; Google Sheets Engine
     </footer>
 
@@ -407,8 +400,8 @@
 
   <!-- Permanent Task Creation Modal -->
   <div id="newTaskModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
-      <div class="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center text-2xl shadow-sm mb-3">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 text-center shadow-2xl border border-slate-100 fade-enter">
+      <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center text-xl sm:text-2xl shadow-sm mb-3">
         <i class="fa-solid fa-tag"></i>
       </div>
       <h4 class="text-base font-black text-slate-900">Name Your Focus Slot</h4>
@@ -416,7 +409,7 @@
         Slots named <strong>"Rest"</strong> or <strong>"Timepass"</strong> track overall time, but do not count toward Trophy quotas or focus points.
       </p>
 
-      <div class="mb-5 text-left">
+      <div class="mb-4 text-left">
         <label for="newTaskTitleInput" class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Task Title</label>
         <input type="text" id="newTaskTitleInput" placeholder="e.g. Deep Work, Rest, Coding" maxlength="50" class="w-full text-xs p-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:border-brand-500 text-slate-800 font-semibold transition" />
       </div>
@@ -478,23 +471,23 @@
 
   <!-- Shop & Rewards Modal -->
   <div id="shopModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-3 sm:p-5 hidden overflow-y-auto">
-    <div class="bg-white relative w-full max-w-3xl rounded-[32px] p-5 sm:p-8 my-auto fade-enter overflow-hidden text-slate-800 shadow-2xl border border-slate-100">
+    <div class="bg-white relative w-full max-w-3xl rounded-[28px] sm:rounded-[32px] p-4 sm:p-8 my-auto fade-enter overflow-hidden text-slate-800 shadow-2xl border border-slate-100">
       
-      <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-        <div class="flex items-center gap-3">
-          <div class="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/25">
-            <i class="fa-solid fa-store text-xl"></i>
+      <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 mb-4 sm:mb-5">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/25">
+            <i class="fa-solid fa-store text-lg sm:text-xl"></i>
           </div>
           <div>
-            <h3 class="text-lg font-black text-slate-900">Chronos Rewards Shop</h3>
-            <p class="text-xs text-slate-400">Redeem points for themes, Drive wallpapers & subscription passes</p>
+            <h3 class="text-base sm:text-lg font-black text-slate-900">Chronos Rewards Shop</h3>
+            <p class="text-[11px] sm:text-xs text-slate-400">Redeem points for themes, Drive wallpapers & subscription passes</p>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800">
-            <i class="fa-solid fa-coins text-amber-500 text-sm"></i>
-            <span id="shopModalPoints" class="text-sm font-black font-mono">0</span>
-            <span class="text-[10px] font-bold uppercase">Points</span>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <div class="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800">
+            <i class="fa-solid fa-coins text-amber-500 text-xs sm:text-sm"></i>
+            <span id="shopModalPoints" class="text-xs sm:text-sm font-black font-mono">0</span>
+            <span class="text-[9px] sm:text-[10px] font-bold uppercase">Points</span>
           </div>
           <button onclick="closeShopModal()" class="w-9 h-9 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm transition" aria-label="Close Shop">
             <i class="fa-solid fa-xmark"></i>
@@ -502,47 +495,47 @@
         </div>
       </div>
 
-      <div class="space-y-6 max-h-[68vh] overflow-y-auto pr-1">
+      <div class="space-y-5 sm:space-y-6 max-h-[72vh] overflow-y-auto pr-1">
         
         <div>
-          <h4 class="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+          <h4 class="text-xs font-black uppercase tracking-wider text-slate-400 mb-2.5 sm:mb-3 flex items-center gap-2">
             <i class="fa-solid fa-bolt text-cyan-600"></i>
             <span>Subscription Passes</span>
           </h4>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
             
-            <div class="p-4 rounded-3xl border border-slate-200 hover:border-cyan-400 transition bg-slate-50/50 flex flex-col justify-between">
+            <div class="p-3.5 sm:p-4 rounded-3xl border border-slate-200 hover:border-cyan-400 transition bg-slate-50/50 flex flex-col justify-between">
               <div>
                 <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-cyan-100 text-cyan-800">Pass</span>
-                <h5 class="text-sm font-extrabold text-slate-900 mt-2">+3 Days Pro</h5>
+                <h5 class="text-sm font-extrabold text-slate-900 mt-1.5 sm:mt-2">+3 Days Pro</h5>
                 <p class="text-[11px] text-slate-500 mt-0.5">Adds 3 full days to plan</p>
               </div>
-              <button id="shopBtn-pass-3" onclick="redeemShopSubscription(3, 150)" class="mt-4 w-full py-2.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center justify-center gap-1.5 transition">
+              <button id="shopBtn-pass-3" onclick="redeemShopSubscription(3, 150)" class="mt-3.5 sm:mt-4 w-full py-2.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center justify-center gap-1.5 transition">
                 <i class="fa-solid fa-coins text-amber-400 text-[10px]"></i>
                 <span>150 Pts</span>
               </button>
             </div>
 
-            <div class="p-4 rounded-3xl border-2 border-cyan-400 bg-cyan-50/30 flex flex-col justify-between relative shadow-xs">
+            <div class="p-3.5 sm:p-4 rounded-3xl border-2 border-cyan-400 bg-cyan-50/30 flex flex-col justify-between relative shadow-xs">
               <span class="absolute -top-2.5 right-4 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full bg-cyan-600 text-white shadow-xs">Popular</span>
               <div>
                 <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-cyan-100 text-cyan-800">Pass</span>
-                <h5 class="text-sm font-extrabold text-slate-900 mt-2">+7 Days Pro</h5>
+                <h5 class="text-sm font-extrabold text-slate-900 mt-1.5 sm:mt-2">+7 Days Pro</h5>
                 <p class="text-[11px] text-slate-500 mt-0.5">Adds 7 full days to plan</p>
               </div>
-              <button id="shopBtn-pass-7" onclick="redeemShopSubscription(7, 300)" class="mt-4 w-full py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-cyan-600/20 transition">
+              <button id="shopBtn-pass-7" onclick="redeemShopSubscription(7, 300)" class="mt-3.5 sm:mt-4 w-full py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-cyan-600/20 transition">
                 <i class="fa-solid fa-coins text-amber-300 text-[10px]"></i>
                 <span>300 Pts</span>
               </button>
             </div>
 
-            <div class="p-4 rounded-3xl border border-slate-200 hover:border-purple-400 transition bg-slate-50/50 flex flex-col justify-between">
+            <div class="p-3.5 sm:p-4 rounded-3xl border border-slate-200 hover:border-purple-400 transition bg-slate-50/50 flex flex-col justify-between">
               <div>
                 <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-purple-100 text-purple-800">Power Pass</span>
-                <h5 class="text-sm font-extrabold text-slate-900 mt-2">+14 Days Pro</h5>
+                <h5 class="text-sm font-extrabold text-slate-900 mt-1.5 sm:mt-2">+14 Days Pro</h5>
                 <p class="text-[11px] text-slate-500 mt-0.5">Long-haul focus pack</p>
               </div>
-              <button id="shopBtn-pass-14" onclick="redeemShopSubscription(14, 500)" class="mt-4 w-full py-2.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center justify-center gap-1.5 transition">
+              <button id="shopBtn-pass-14" onclick="redeemShopSubscription(14, 500)" class="mt-3.5 sm:mt-4 w-full py-2.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center justify-center gap-1.5 transition">
                 <i class="fa-solid fa-coins text-amber-400 text-[10px]"></i>
                 <span>500 Pts</span>
               </button>
@@ -552,15 +545,15 @@
         </div>
 
         <div>
-          <h4 class="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+          <h4 class="text-xs font-black uppercase tracking-wider text-slate-400 mb-2.5 sm:mb-3 flex items-center gap-2">
             <i class="fa-solid fa-palette text-indigo-600"></i>
             <span>Visual Themes & Wallpapers</span>
           </h4>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
             
-            <div class="p-4 rounded-3xl border border-slate-200 bg-white flex flex-col justify-between">
+            <div class="p-3.5 sm:p-4 rounded-3xl border border-slate-200 bg-white flex flex-col justify-between">
               <div>
-                <div class="w-full h-12 rounded-2xl bg-slate-100 border border-slate-200 mb-2.5 flex items-center justify-center text-xs font-bold text-slate-500">
+                <div class="w-full h-11 sm:h-12 rounded-2xl bg-slate-100 border border-slate-200 mb-2 flex items-center justify-center text-xs font-bold text-slate-500">
                   Clean Light
                 </div>
                 <h5 class="text-xs font-bold text-slate-900">Default Minimal</h5>
@@ -571,9 +564,9 @@
               </button>
             </div>
 
-            <div class="p-4 rounded-3xl border border-slate-200 bg-white flex flex-col justify-between">
+            <div class="p-3.5 sm:p-4 rounded-3xl border border-slate-200 bg-white flex flex-col justify-between">
               <div>
-                <div class="w-full h-12 rounded-2xl bg-slate-900 border border-slate-800 mb-2.5 flex items-center justify-center text-xs font-bold text-slate-200">
+                <div class="w-full h-11 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 mb-2 flex items-center justify-center text-xs font-bold text-slate-200">
                   Midnight
                 </div>
                 <h5 class="text-xs font-bold text-slate-900">Midnight Slate</h5>
@@ -584,9 +577,9 @@
               </button>
             </div>
 
-            <div class="p-4 rounded-3xl border border-slate-200 bg-white flex flex-col justify-between">
+            <div class="p-3.5 sm:p-4 rounded-3xl border border-slate-200 bg-white flex flex-col justify-between">
               <div>
-                <div class="w-full h-12 rounded-2xl bg-emerald-950 border border-emerald-800 mb-2.5 flex items-center justify-center text-xs font-bold text-emerald-300">
+                <div class="w-full h-11 sm:h-12 rounded-2xl bg-emerald-950 border border-emerald-800 mb-2 flex items-center justify-center text-xs font-bold text-emerald-300">
                   Emerald
                 </div>
                 <h5 class="text-xs font-bold text-slate-900">Forest Haven</h5>
@@ -599,9 +592,9 @@
 
           </div>
 
-          <div class="mt-4 p-4 rounded-3xl border border-amber-200 bg-amber-50/40 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-3.5">
-              <div class="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-lg shadow-sm">
+          <div class="mt-3.5 sm:mt-4 p-3.5 sm:p-4 rounded-3xl border border-amber-200 bg-amber-50/40 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-base sm:text-lg shadow-sm">
                 <i class="fa-brands fa-google-drive"></i>
               </div>
               <div>
@@ -629,8 +622,8 @@
 
   <!-- Custom Google Drive Wallpaper Setup Modal -->
   <div id="driveWallpaperModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
-      <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 mx-auto flex items-center justify-center text-2xl shadow-sm mb-3">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 text-center shadow-2xl border border-slate-100 fade-enter">
+      <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-50 text-amber-600 mx-auto flex items-center justify-center text-xl sm:text-2xl shadow-sm mb-3">
         <i class="fa-brands fa-google-drive"></i>
       </div>
       <h4 class="text-base font-black text-slate-900">Custom Drive Wallpaper</h4>
@@ -638,7 +631,7 @@
         Paste your Google Drive image share link below (Make sure link sharing is set to "Anyone with the link can view").
       </p>
 
-      <div class="mb-5 text-left">
+      <div class="mb-4 text-left">
         <label for="driveWallpaperInput" class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Drive Image Link or ID</label>
         <input type="text" id="driveWallpaperInput" placeholder="https://drive.google.com/file/d/xxxx/view?usp=sharing" class="w-full text-xs p-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:border-amber-500 text-slate-800 font-mono" />
       </div>
@@ -657,16 +650,16 @@
 
   <!-- Trophy Collection & Bumper Modal -->
   <div id="trophyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-3 sm:p-5 hidden overflow-y-auto">
-    <div class="bg-white relative w-full max-w-2xl rounded-[32px] p-5 sm:p-7 my-auto fade-enter overflow-hidden text-slate-800 shadow-2xl border border-slate-100">
+    <div class="bg-white relative w-full max-w-2xl rounded-[28px] sm:rounded-[32px] p-4 sm:p-7 my-auto fade-enter overflow-hidden text-slate-800 shadow-2xl border border-slate-100">
       
-      <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-        <div class="flex items-center gap-3">
-          <div class="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/25">
-            <i class="fa-solid fa-trophy text-xl"></i>
+      <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 mb-4 sm:mb-5">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/25">
+            <i class="fa-solid fa-trophy text-lg sm:text-xl"></i>
           </div>
           <div>
-            <h3 class="text-lg font-black text-slate-900">Trophy Hall & Streaks</h3>
-            <p class="text-xs text-slate-400">Renewable daily accomplishments & the 56-day Diamond milestone</p>
+            <h3 class="text-base sm:text-lg font-black text-slate-900">Trophy Hall & Streaks</h3>
+            <p class="text-[11px] sm:text-xs text-slate-400">Renewable daily accomplishments & the 56-day Diamond milestone</p>
           </div>
         </div>
         <button onclick="closeTrophyModal()" class="w-9 h-9 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm transition" aria-label="Close Trophy Hall">
@@ -674,82 +667,82 @@
         </button>
       </div>
 
-      <div class="space-y-5 max-h-[68vh] overflow-y-auto pr-1">
+      <div class="space-y-4 sm:space-y-5 max-h-[72vh] overflow-y-auto pr-1">
         
-        <div class="rounded-3xl bg-gradient-to-tr from-purple-900 to-indigo-900 p-5 text-white relative overflow-hidden shadow-lg">
-          <div class="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="rounded-3xl bg-gradient-to-tr from-purple-900 to-indigo-900 p-4 sm:p-5 text-white relative overflow-hidden shadow-lg">
+          <div class="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
             <div>
               <div class="flex items-center gap-2">
                 <span class="px-2.5 py-0.5 rounded-full bg-purple-400/30 text-purple-200 text-[10px] font-black uppercase">Grand Bonus</span>
                 <span id="bumperStageBadge" class="text-xs font-bold text-amber-300">Stage 1 of 5</span>
               </div>
-              <h4 class="text-lg font-black mt-1.5">+100 Points Bumper Reward</h4>
-              <p id="bumperReqDesc" class="text-xs text-purple-200/80 mt-0.5">Requires: 1 Bronze + 1 Silver Trophy (consumed on claim)</p>
-              <div id="bumperTrophyProgress" class="mt-2 text-[11px] font-mono text-purple-300">
+              <h4 class="text-base sm:text-lg font-black mt-1 sm:mt-1.5">+100 Points Bumper Reward</h4>
+              <p id="bumperReqDesc" class="text-[11px] sm:text-xs text-purple-200/80 mt-0.5">Requires: 1 Bronze + 1 Silver Trophy (consumed on claim)</p>
+              <div id="bumperTrophyProgress" class="mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] font-mono text-purple-300">
                 Bronze: 0/1 | Silver: 0/1
               </div>
             </div>
-            <button id="claimBumperBtn" onclick="claimBumperBonus()" class="px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md shadow-amber-400/30 transition whitespace-nowrap">
+            <button id="claimBumperBtn" onclick="claimBumperBonus()" class="w-full sm:w-auto px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md shadow-amber-400/30 transition whitespace-nowrap">
               Claim +100 PTS
             </button>
           </div>
         </div>
 
-        <div class="p-4 sm:p-5 rounded-3xl bg-slate-50 border border-slate-200/80">
+        <div class="p-3.5 sm:p-5 rounded-3xl bg-slate-50 border border-slate-200/80">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-slate-700 flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5 sm:gap-2">
               <i class="fa-solid fa-gem text-cyan-500"></i>
               <span>Diamond Trophy Streak (8h Pure Focus / Day for 56 Days)</span>
             </span>
             <span id="streakCountDisplay" class="text-xs font-black font-mono text-cyan-700">0 / 56 Days</span>
           </div>
-          <div class="w-full h-3 rounded-full bg-slate-200 overflow-hidden">
+          <div class="w-full h-2.5 sm:h-3 rounded-full bg-slate-200 overflow-hidden">
             <div id="streakProgressBar" class="h-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all duration-500" style="width: 0%;"></div>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
           
-          <div class="p-4 rounded-3xl border border-amber-200 bg-amber-50/40 text-center flex flex-col items-center justify-between">
-            <div class="w-12 h-12 rounded-2xl bg-amber-200/70 text-amber-800 flex items-center justify-center text-xl shadow-2xs mb-2">
+          <div class="p-3.5 sm:p-4 rounded-3xl border border-amber-200 bg-amber-50/40 text-center flex flex-col items-center justify-between">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-200/70 text-amber-800 flex items-center justify-center text-lg sm:text-xl shadow-2xs mb-1.5 sm:mb-2">
               <i class="fa-solid fa-award"></i>
             </div>
             <h5 class="text-xs font-black text-slate-900">Bronze Trophy</h5>
             <p class="text-[10px] text-slate-500 mt-0.5">4 Hours Pure Focus</p>
-            <div class="mt-3 w-full py-1.5 rounded-xl bg-amber-200/60 text-amber-900 font-black text-xs">
+            <div class="mt-2.5 sm:mt-3 w-full py-1.5 rounded-xl bg-amber-200/60 text-amber-900 font-black text-xs">
               <span id="trophyCount-bronze">0</span> Owned
             </div>
           </div>
 
-          <div class="p-4 rounded-3xl border border-slate-300 bg-slate-100/60 text-center flex flex-col items-center justify-between">
-            <div class="w-12 h-12 rounded-2xl bg-slate-300/70 text-slate-700 flex items-center justify-center text-xl shadow-2xs mb-2">
+          <div class="p-3.5 sm:p-4 rounded-3xl border border-slate-300 bg-slate-100/60 text-center flex flex-col items-center justify-between">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-slate-300/70 text-slate-700 flex items-center justify-center text-lg sm:text-xl shadow-2xs mb-1.5 sm:mb-2">
               <i class="fa-solid fa-medal"></i>
             </div>
             <h5 class="text-xs font-black text-slate-900">Silver Trophy</h5>
             <p class="text-[10px] text-slate-500 mt-0.5">8 Hours Pure Focus</p>
-            <div class="mt-3 w-full py-1.5 rounded-xl bg-slate-200 text-slate-800 font-black text-xs">
+            <div class="mt-2.5 sm:mt-3 w-full py-1.5 rounded-xl bg-slate-200 text-slate-800 font-black text-xs">
               <span id="trophyCount-silver">0</span> Owned
             </div>
           </div>
 
-          <div class="p-4 rounded-3xl border border-yellow-300 bg-yellow-50/50 text-center flex flex-col items-center justify-between">
-            <div class="w-12 h-12 rounded-2xl bg-yellow-300/80 text-yellow-900 flex items-center justify-center text-xl shadow-2xs mb-2">
+          <div class="p-3.5 sm:p-4 rounded-3xl border border-yellow-300 bg-yellow-50/50 text-center flex flex-col items-center justify-between">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-yellow-300/80 text-yellow-900 flex items-center justify-center text-lg sm:text-xl shadow-2xs mb-1.5 sm:mb-2">
               <i class="fa-solid fa-crown"></i>
             </div>
             <h5 class="text-xs font-black text-slate-900">Golden Trophy</h5>
             <p class="text-[10px] text-slate-500 mt-0.5">15 Hours Pure Focus</p>
-            <div class="mt-3 w-full py-1.5 rounded-xl bg-yellow-200 text-yellow-900 font-black text-xs">
+            <div class="mt-2.5 sm:mt-3 w-full py-1.5 rounded-xl bg-yellow-200 text-yellow-900 font-black text-xs">
               <span id="trophyCount-golden">0</span> Owned
             </div>
           </div>
 
-          <div class="p-4 rounded-3xl border border-cyan-300 bg-cyan-50/50 text-center flex flex-col items-center justify-between">
-            <div class="w-12 h-12 rounded-2xl bg-cyan-300/80 text-cyan-900 flex items-center justify-center text-xl shadow-2xs mb-2">
+          <div class="p-3.5 sm:p-4 rounded-3xl border border-cyan-300 bg-cyan-50/50 text-center flex flex-col items-center justify-between">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-cyan-300/80 text-cyan-900 flex items-center justify-center text-lg sm:text-xl shadow-2xs mb-1.5 sm:mb-2">
               <i class="fa-solid fa-gem"></i>
             </div>
             <h5 class="text-xs font-black text-slate-900">Diamond Trophy</h5>
             <p class="text-[10px] text-slate-500 mt-0.5">56d Daily Streak</p>
-            <div id="diamondStatusPill" class="mt-3 w-full py-1.5 rounded-xl bg-slate-200 text-slate-500 font-black text-xs">
+            <div id="diamondStatusPill" class="mt-2.5 sm:mt-3 w-full py-1.5 rounded-xl bg-slate-200 text-slate-500 font-black text-xs">
               Locked
             </div>
           </div>
@@ -763,18 +756,18 @@
 
   <!-- Usage & Subscription Modal -->
   <div id="usageModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-md p-3 sm:p-5 hidden overflow-y-auto">
-    <div class="usage-light-bg relative w-full max-w-3xl rounded-[32px] p-5 sm:p-8 my-auto fade-enter overflow-hidden text-slate-800 shadow-2xl">
-      <div class="relative z-10 flex items-center justify-between pb-5 border-b border-slate-200 mb-6">
-        <div class="flex items-center gap-3.5">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/25">
-            <i class="fa-solid fa-bolt text-xl"></i>
+    <div class="bg-white relative w-full max-w-3xl rounded-[28px] sm:rounded-[32px] p-4 sm:p-8 my-auto fade-enter overflow-hidden text-slate-800 shadow-2xl border border-slate-100">
+      <div class="relative z-10 flex items-center justify-between pb-4 sm:pb-5 border-b border-slate-200 mb-5 sm:mb-6">
+        <div class="flex items-center gap-2.5 sm:gap-3.5">
+          <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/25">
+            <i class="fa-solid fa-bolt text-lg sm:text-xl"></i>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h3 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Usage & Subscriptions</h3>
-              <span class="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-cyan-50 text-cyan-700 border border-cyan-200">PRO PASS</span>
+              <h3 class="text-base sm:text-xl font-black text-slate-900 tracking-tight">Usage & Subscriptions</h3>
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold tracking-wider uppercase bg-cyan-50 text-cyan-700 border border-cyan-200">PRO PASS</span>
             </div>
-            <p class="text-xs text-slate-500 mt-0.5">Cloud synchronization & Google Sheets analytics</p>
+            <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Cloud synchronization & Google Sheets analytics</p>
           </div>
         </div>
         <button id="closeUsageBtn" onclick="closeUsageModal()" class="w-9 h-9 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center text-sm transition" aria-label="Close Usage Modal">
@@ -782,81 +775,81 @@
         </button>
       </div>
 
-      <div class="relative z-10 rounded-3xl bg-white/95 p-4 sm:p-5 border border-slate-200/80 shadow-xs mb-6 flex flex-col md:flex-row items-center justify-between gap-5">
+      <div class="relative z-10 rounded-3xl bg-slate-50 p-4 sm:p-5 border border-slate-200/80 shadow-xs mb-5 sm:mb-6 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-5">
         <div class="text-center md:text-left">
           <span class="text-[10px] font-black uppercase tracking-widest text-cyan-600 flex items-center gap-2 justify-center md:justify-start">
             <span class="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse"></span>
             System Status
           </span>
-          <h4 id="usagePlanStatus" class="text-lg sm:text-xl font-black text-slate-900 mt-1">Active Plan</h4>
-          <p id="usageStatusMessage" class="text-xs text-slate-500 mt-1 max-w-sm">
+          <h4 id="usagePlanStatus" class="text-base sm:text-xl font-black text-slate-900 mt-1">Active Plan</h4>
+          <p id="usageStatusMessage" class="text-xs text-slate-500 mt-0.5 sm:mt-1 max-w-sm">
             Activate a tier below or redeem points in the shop to maintain stopwatch timers.
           </p>
         </div>
 
-        <div class="flex items-center gap-2 bg-slate-100/80 p-2 sm:p-2.5 rounded-2xl border border-slate-200">
-          <div class="text-center px-2 sm:px-3 py-1.5 rounded-xl bg-white border border-slate-200/60 min-w-[50px]">
-            <span id="hudDays" class="block text-base sm:text-xl font-black font-mono text-cyan-700 leading-tight">00</span>
-            <span class="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Days</span>
+        <div class="flex items-center gap-1.5 sm:gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-2xs">
+          <div class="text-center px-2 sm:px-3 py-1 rounded-xl bg-slate-50 border border-slate-200/60 min-w-[44px] sm:min-w-[50px]">
+            <span id="hudDays" class="block text-sm sm:text-xl font-black font-mono text-cyan-700 leading-tight">00</span>
+            <span class="text-[8px] sm:text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Days</span>
           </div>
           <span class="text-slate-400 font-bold">:</span>
-          <div class="text-center px-2 sm:px-3 py-1.5 rounded-xl bg-white border border-slate-200/60 min-w-[50px]">
-            <span id="hudHours" class="block text-base sm:text-xl font-black font-mono text-cyan-700 leading-tight">00</span>
-            <span class="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Hours</span>
+          <div class="text-center px-2 sm:px-3 py-1 rounded-xl bg-slate-50 border border-slate-200/60 min-w-[44px] sm:min-w-[50px]">
+            <span id="hudHours" class="block text-sm sm:text-xl font-black font-mono text-cyan-700 leading-tight">00</span>
+            <span class="text-[8px] sm:text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Hours</span>
           </div>
           <span class="text-slate-400 font-bold">:</span>
-          <div class="text-center px-2 sm:px-3 py-1.5 rounded-xl bg-white border border-slate-200/60 min-w-[50px]">
-            <span id="hudMins" class="block text-base sm:text-xl font-black font-mono text-cyan-700 leading-tight">00</span>
-            <span class="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Mins</span>
+          <div class="text-center px-2 sm:px-3 py-1 rounded-xl bg-slate-50 border border-slate-200/60 min-w-[44px] sm:min-w-[50px]">
+            <span id="hudMins" class="block text-sm sm:text-xl font-black font-mono text-cyan-700 leading-tight">00</span>
+            <span class="text-[8px] sm:text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Mins</span>
           </div>
           <span class="text-slate-400 font-bold">:</span>
-          <div class="text-center px-2 sm:px-3 py-1.5 rounded-xl bg-white border border-slate-200/60 min-w-[50px]">
-            <span id="hudSecs" class="block text-base sm:text-xl font-black font-mono text-amber-600 leading-tight">00</span>
-            <span class="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Secs</span>
+          <div class="text-center px-2 sm:px-3 py-1 rounded-xl bg-slate-50 border border-slate-200/60 min-w-[44px] sm:min-w-[50px]">
+            <span id="hudSecs" class="block text-sm sm:text-xl font-black font-mono text-amber-600 leading-tight">00</span>
+            <span class="text-[8px] sm:text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Secs</span>
           </div>
         </div>
       </div>
 
-      <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+      <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-2">
         
-        <div class="bg-white rounded-3xl p-5 border border-slate-200 flex flex-col justify-between">
+        <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
           <div>
             <span class="px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase border border-emerald-200">Starter</span>
-            <h5 class="text-base font-extrabold text-slate-900 mt-2">3 Days Pack</h5>
-            <div class="my-3 pb-2 border-b border-slate-100 flex items-baseline gap-1">
-              <span class="text-2xl font-black text-slate-900">₹30</span>
+            <h5 class="text-sm sm:text-base font-extrabold text-slate-900 mt-2">3 Days Pack</h5>
+            <div class="my-2.5 sm:my-3 pb-2 border-b border-slate-100 flex items-baseline gap-1">
+              <span class="text-xl sm:text-2xl font-black text-slate-900">₹30</span>
               <span class="text-xs text-slate-400">/ 3 days</span>
             </div>
           </div>
-          <button onclick="startPlanPurchase(3, 30)" class="w-full py-3 rounded-2xl bg-slate-100 hover:bg-emerald-600 text-slate-800 hover:text-white font-bold text-xs transition">
+          <button onclick="startPlanPurchase(3, 30)" class="w-full py-2.5 sm:py-3 rounded-2xl bg-slate-100 hover:bg-emerald-600 text-slate-800 hover:text-white font-bold text-xs transition">
             Activate 3 Days
           </button>
         </div>
 
-        <div class="bg-gradient-to-b from-cyan-50/50 to-white rounded-3xl p-5 border-2 border-cyan-400 flex flex-col justify-between shadow-xs">
+        <div class="bg-gradient-to-b from-cyan-50/50 to-white rounded-3xl p-4 sm:p-5 border-2 border-cyan-400 flex flex-col justify-between shadow-xs">
           <div>
             <span class="px-2.5 py-0.5 rounded-lg bg-cyan-600 text-white text-[10px] font-black uppercase">Most Popular</span>
-            <h5 class="text-base font-extrabold text-slate-900 mt-2">28 Days Pack</h5>
-            <div class="my-3 pb-2 border-b border-cyan-100 flex items-baseline gap-1">
-              <span class="text-2xl font-black text-cyan-900">₹250</span>
+            <h5 class="text-sm sm:text-base font-extrabold text-slate-900 mt-2">28 Days Pack</h5>
+            <div class="my-2.5 sm:my-3 pb-2 border-b border-cyan-100 flex items-baseline gap-1">
+              <span class="text-xl sm:text-2xl font-black text-cyan-900">₹250</span>
               <span class="text-xs text-cyan-700">/ 28 days</span>
             </div>
           </div>
-          <button onclick="startPlanPurchase(28, 250)" class="w-full py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs transition shadow-md shadow-cyan-600/25">
+          <button onclick="startPlanPurchase(28, 250)" class="w-full py-2.5 sm:py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs transition shadow-md shadow-cyan-600/25">
             Activate 28 Days
           </button>
         </div>
 
-        <div class="bg-white rounded-3xl p-5 border border-slate-200 flex flex-col justify-between">
+        <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
           <div>
             <span class="px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 text-[10px] font-black uppercase border border-purple-200">Long Haul</span>
-            <h5 class="text-base font-extrabold text-slate-900 mt-2">58 Days Pack</h5>
-            <div class="my-3 pb-2 border-b border-slate-100 flex items-baseline gap-1">
-              <span class="text-2xl font-black text-purple-900">₹500</span>
+            <h5 class="text-sm sm:text-base font-extrabold text-slate-900 mt-2">58 Days Pack</h5>
+            <div class="my-2.5 sm:my-3 pb-2 border-b border-slate-100 flex items-baseline gap-1">
+              <span class="text-xl sm:text-2xl font-black text-purple-900">₹500</span>
               <span class="text-xs text-slate-400">/ 58 days</span>
             </div>
           </div>
-          <button onclick="startPlanPurchase(58, 500)" class="w-full py-3 rounded-2xl bg-slate-100 hover:bg-purple-600 text-slate-800 hover:text-white font-bold text-xs transition">
+          <button onclick="startPlanPurchase(58, 500)" class="w-full py-2.5 sm:py-3 rounded-2xl bg-slate-100 hover:bg-purple-600 text-slate-800 hover:text-white font-bold text-xs transition">
             Activate 58 Days
           </button>
         </div>
@@ -894,83 +887,83 @@
   </div>
 
   <!-- Analytics Dashboard Modal -->
-  <div id="analyticsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-3 sm:p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[94vh] flex flex-col shadow-2xl border border-slate-100 fade-enter overflow-hidden">
+  <div id="analyticsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-2.5 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[96vh] sm:max-h-[94vh] flex flex-col shadow-2xl border border-slate-100 fade-enter overflow-hidden">
       
-      <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-brand-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/25">
-            <i class="fa-solid fa-chart-pie text-base"></i>
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2.5 bg-slate-50/70">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-brand-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/25">
+            <i class="fa-solid fa-chart-pie text-sm sm:text-base"></i>
           </div>
           <div>
-            <h3 class="text-sm sm:text-base font-extrabold text-slate-900">Focus & Rest Analytics</h3>
-            <p class="text-[11px] text-slate-400">Streamed live from Google Sheets Task_Logs</p>
+            <h3 class="text-xs sm:text-base font-extrabold text-slate-900">Focus & Rest Analytics</h3>
+            <p class="text-[10px] sm:text-[11px] text-slate-400">Streamed live from Google Sheets Task_Logs</p>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <div class="flex bg-slate-200/70 p-0.5 rounded-xl text-xs font-bold text-slate-600">
-            <button id="rangeDailyBtn" onclick="setAnalyticsRange('daily')" class="px-3 py-1.5 rounded-lg bg-white shadow-xs text-brand-600">Daily</button>
-            <button id="rangeWeeklyBtn" onclick="setAnalyticsRange('weekly')" class="px-3 py-1.5 rounded-lg">Weekly</button>
-            <button id="rangeMonthlyBtn" onclick="setAnalyticsRange('monthly')" class="px-3 py-1.5 rounded-lg">Monthly</button>
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <div class="flex bg-slate-200/70 p-0.5 rounded-xl text-[11px] sm:text-xs font-bold text-slate-600">
+            <button id="rangeDailyBtn" onclick="setAnalyticsRange('daily')" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-white shadow-xs text-brand-600 font-extrabold">Daily</button>
+            <button id="rangeWeeklyBtn" onclick="setAnalyticsRange('weekly')" class="px-2.5 sm:px-3 py-1.5 rounded-lg">Weekly</button>
+            <button id="rangeMonthlyBtn" onclick="setAnalyticsRange('monthly')" class="px-2.5 sm:px-3 py-1.5 rounded-lg">Monthly</button>
           </div>
-          <button onclick="refreshAnalyticsData(true)" class="w-9 h-9 rounded-2xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 flex items-center justify-center text-xs transition" aria-label="Refresh Data">
+          <button onclick="refreshAnalyticsData(true)" class="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 flex items-center justify-center text-xs transition" aria-label="Refresh Data">
             <i class="fa-solid fa-arrows-rotate" id="refreshIconSpin"></i>
           </button>
-          <button onclick="exportDashboardAsImage()" class="w-9 h-9 rounded-2xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 flex items-center justify-center text-xs transition" aria-label="Export Snapshot">
+          <button onclick="exportDashboardAsImage()" class="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 flex items-center justify-center text-xs transition" aria-label="Export Snapshot">
             <i class="fa-solid fa-camera"></i>
           </button>
-          <button onclick="closeAnalyticsDashboardModal()" class="w-9 h-9 rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center text-sm transition" aria-label="Close Analytics">
+          <button onclick="closeAnalyticsDashboardModal()" class="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center text-sm transition" aria-label="Close Analytics">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
       </div>
 
-      <div id="analyticsExportContainer" class="p-6 overflow-y-auto flex-grow space-y-5 bg-slate-50/40">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div id="analyticsExportContainer" class="p-4 sm:p-6 overflow-y-auto flex-grow space-y-4 sm:space-y-5 bg-slate-50/40">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
           
-          <div class="bg-white p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
+          <div class="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
             <div>
               <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pure Focus (Quota)</span>
-              <p id="modalFilteredDuration" class="text-xl font-black font-mono text-blue-600 mt-1">0h 0m</p>
+              <p id="modalFilteredDuration" class="text-lg sm:text-xl font-black font-mono text-blue-600 mt-0.5 sm:mt-1">0h 0m</p>
             </div>
-            <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm sm:text-base">
               <i class="fa-solid fa-brain"></i>
             </div>
           </div>
 
-          <div class="bg-white p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
+          <div class="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
             <div>
               <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Tracked Time</span>
-              <p id="modalTotalDuration" class="text-xl font-black font-mono text-emerald-600 mt-1">0h 0m</p>
+              <p id="modalTotalDuration" class="text-lg sm:text-xl font-black font-mono text-emerald-600 mt-0.5 sm:mt-1">0h 0m</p>
             </div>
-            <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm sm:text-base">
               <i class="fa-solid fa-clock"></i>
             </div>
           </div>
 
-          <div class="bg-white p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
+          <div class="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
             <div class="truncate mr-2">
               <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top Focus Area</span>
-              <p id="modalTopTaskName" class="text-sm font-extrabold text-indigo-700 mt-1 truncate">None</p>
+              <p id="modalTopTaskName" class="text-xs sm:text-sm font-extrabold text-indigo-700 mt-0.5 sm:mt-1 truncate">None</p>
             </div>
-            <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base flex-shrink-0">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm sm:text-base flex-shrink-0">
               <i class="fa-solid fa-medal"></i>
             </div>
           </div>
 
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="bg-white p-5 rounded-3xl border border-slate-200/80 flex flex-col">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+          <div class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 flex flex-col">
             <span class="text-xs font-bold text-slate-800 mb-2">Time per Task (Minutes)</span>
-            <div class="w-full h-56 relative flex items-center justify-center">
+            <div class="w-full h-48 sm:h-56 relative flex items-center justify-center">
               <canvas id="analyticsBarChart"></canvas>
             </div>
           </div>
-          <div class="bg-white p-5 rounded-3xl border border-slate-200/80 flex flex-col">
+          <div class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 flex flex-col">
             <span class="text-xs font-bold text-slate-800 mb-2">Focus vs. Rest Share</span>
-            <div class="w-full h-56 relative flex items-center justify-center">
+            <div class="w-full h-48 sm:h-56 relative flex items-center justify-center">
               <canvas id="analyticsPieChart"></canvas>
             </div>
           </div>
@@ -980,9 +973,9 @@
     </div>
   </div>
 
-  <!-- Settings Modal (z-[60]) -->
-  <div id="settingsModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 fade-enter">
+  <!-- Settings Modal (z-[80]) -->
+  <div id="settingsModal" class="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 fade-enter">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
         <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
           <i class="fa-solid fa-gear text-slate-500"></i>
@@ -1008,7 +1001,7 @@
     </div>
   </div>
 
-  <!-- Mandatory Auth Gate Modal (Only on cold boot if never configured) -->
+  <!-- Mandatory Auth Gate Modal (Only on cold boot if no credentials exist) -->
   <div id="mandatoryAuthGate" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 hidden">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
       <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-brand-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-xl shadow-brand-500/25 mb-4">
@@ -1016,7 +1009,7 @@
       </div>
       <h3 class="text-lg font-black text-slate-900">Connect Google Sheets</h3>
       <p class="text-xs text-slate-500 mt-1 mb-6 leading-relaxed">
-        Link your Google account to log sessions, earn trophies, and track your focus analytics.
+        Link your Google account to log sessions, earn trophies, and track your focus analytics across all devices.
       </p>
 
       <button onclick="requestGoogleToken(true)" class="w-full py-3.5 px-4 rounded-2xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center justify-center gap-3 shadow-lg transition">
@@ -1037,33 +1030,43 @@
 
   <!-- Subscription Expired Blocker Modal -->
   <div id="expiredSubscriptionGate" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter relative">
+      <button onclick="closeSubscriptionGate()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs transition" aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
       <div class="w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 mx-auto flex items-center justify-center text-3xl shadow-sm mb-4">
         <i class="fa-solid fa-hourglass-end"></i>
       </div>
       <h3 class="text-lg font-black text-slate-900">Subscription Required</h3>
       <p class="text-xs text-slate-500 mt-2 mb-6 leading-relaxed">
-        Your Chronos access plan has expired. Activate a plan or redeem points in the shop to track sessions.
+        An active subscription is required to add or start tasks. Activate a plan or redeem points in the shop to continue.
       </p>
 
-      <button onclick="openUsageModal(true)" class="w-full py-3.5 px-4 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/30 transition">
-        <i class="fa-solid fa-bolt"></i>
-        <span>Go to Usage & Activate Plan</span>
-      </button>
+      <div class="flex flex-col gap-2.5">
+        <button onclick="openUsageModal(true)" class="w-full py-3.5 px-4 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/30 transition">
+          <i class="fa-solid fa-bolt"></i>
+          <span>Activate a Plan</span>
+        </button>
+        <button onclick="closeSubscriptionGate(); openShopModal();" class="w-full py-3 px-4 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs flex items-center justify-center gap-2 border border-amber-200 transition">
+          <i class="fa-solid fa-store text-amber-600"></i>
+          <span>Redeem Passes in Shop</span>
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Global Toast -->
-  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] bg-slate-900/95 text-white text-xs font-semibold px-5 py-2.5 rounded-full shadow-2xl pointer-events-none transition-all duration-300 opacity-0 translate-y-3">
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[90] bg-slate-900/95 text-white text-xs font-semibold px-5 py-2.5 rounded-full shadow-2xl pointer-events-none transition-all duration-300 opacity-0 translate-y-3">
     Message
   </div>
 
-  <!-- Application Logic -->
+  <!-- Application Logic (Universal Anti-Logout & Mobile-Resilient Engine) -->
   <script>
     // ----------------------------------------------------
     // State Keys & Configuration
     // ----------------------------------------------------
     const STORAGE_KEY_AUTH_TOKEN = 'chronos_access_token';
+    const STORAGE_KEY_TOKEN_EXPIRY = 'chronos_token_expiry';
     const STORAGE_KEY_AUTH_PROFILE = 'chronos_auth_profile';
     const STORAGE_KEY_CLIENT_ID = 'chronos_client_id';
     const STORAGE_KEY_SHEET_ID = 'chronos_sheet_id';
@@ -1071,6 +1074,7 @@
     const PLAN_SECRET_CODE = '@@112267';
 
     let accessToken = null;
+    let tokenExpiresAt = 0;
     let userProfile = null;
     let tokenClient = null;
     let isRequestingToken = false;
@@ -1107,10 +1111,11 @@
     let isStateSyncing = false;
     let isShopPurchasing = false;
 
-    // Performance Caching
+    // Performance Caching & Mobile Queue
     const clockElementCache = new Map();
     let sheetQueue = [];
     let isFlushingQueue = false;
+    let pendingAuthQueue = [];
 
     let barChartInstance = null;
     let pieChartInstance = null;
@@ -1146,8 +1151,8 @@
       reset() {
         this.x = Math.random() * canvas.width;
         this.y = canvas.height + Math.random() * 50;
-        this.radius = Math.random() * 6 + 2.5;
-        this.speed = Math.random() * 0.45 + 0.25;
+        this.radius = Math.random() * 5 + 2;
+        this.speed = Math.random() * 0.4 + 0.2;
         this.alpha = Math.random() * 0.12 + 0.04;
       }
       update() {
@@ -1161,7 +1166,7 @@
         ctx.fill();
       }
     }
-    for (let i = 0; i < 22; i++) bubbles.push(new Bubble());
+    for (let i = 0; i < 16; i++) bubbles.push(new Bubble());
     function animateBubbles() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       bubbles.forEach(b => { b.update(); b.draw(); });
@@ -1170,7 +1175,7 @@
     animateBubbles();
 
     // ----------------------------------------------------
-    // Application Initialization
+    // Application Initialization (Mobile & Desktop Lifecycle)
     // ----------------------------------------------------
     window.addEventListener('load', async () => {
       WRITE_PERMISSION_GRANTED = false;
@@ -1187,22 +1192,26 @@
       applyWorkspaceTheme(activeTheme, customWallpaperUrl);
       updateSubscriptionTicker();
 
+      // Universal Clock Tick
       setInterval(() => {
         tickTimers();
         updateCountdownToMidnight();
         updateSubscriptionTicker();
       }, 500);
 
-      // Periodic checkpoint log every 60 seconds
+      // Checkpoint flush every 60 seconds
       setInterval(async () => {
         if (!WRITE_PERMISSION_GRANTED || !accessToken || !isSubscriptionActive()) return;
         await flushActiveTaskCheckpoints();
       }, 60000);
 
+      // Mobile sleep and background lifecycle listeners
       const handleAppResume = () => {
         reconcileTimers();
         tickTimers();
-        if (isCloudHydrated) enforceSubscriptionCheck();
+        if (accessToken) {
+          syncWithSpreadsheet().catch(() => {});
+        }
       };
 
       document.addEventListener('visibilitychange', () => {
@@ -1210,6 +1219,7 @@
       });
       window.addEventListener('pageshow', handleAppResume);
       window.addEventListener('focus', handleAppResume);
+      window.addEventListener('resume', handleAppResume);
 
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -1220,6 +1230,7 @@
           closeSettingsModal();
           closeNewTaskModal();
           closeDriveWallpaperModal();
+          closeSubscriptionGate();
         }
       });
 
@@ -1246,10 +1257,11 @@
     }
 
     // ----------------------------------------------------
-    // Permanent Auth Session (Never Revoke Automatically)
+    // Permanent Auth Session (Non-Destructive & No-Logout Model)
     // ----------------------------------------------------
     function initAuthSession() {
       const savedToken = localStorage.getItem(STORAGE_KEY_AUTH_TOKEN);
+      const savedExpiry = parseInt(localStorage.getItem(STORAGE_KEY_TOKEN_EXPIRY), 10) || 0;
       const rawProfile = localStorage.getItem(STORAGE_KEY_AUTH_PROFILE);
 
       if (rawProfile) {
@@ -1258,6 +1270,13 @@
 
       if (savedToken) {
         accessToken = savedToken;
+        tokenExpiresAt = savedExpiry;
+
+        if (tokenExpiresAt > 0 && Date.now() > tokenExpiresAt) {
+          const banner = document.getElementById('reconnectBanner');
+          if (banner) banner.classList.remove('hidden');
+        }
+
         updateAuthUI(true);
       } else {
         updateAuthUI(false);
@@ -1316,17 +1335,23 @@
             isRequestingToken = false;
 
             if (resp && resp.error) {
-              showToast('Google session refresh postponed');
+              const banner = document.getElementById('reconnectBanner');
+              if (banner) banner.classList.remove('hidden');
               return;
             }
 
             if (resp && resp.access_token) {
               accessToken = resp.access_token;
+              const expiresIn = parseInt(resp.expires_in, 10) || 3600;
+              tokenExpiresAt = Date.now() + (expiresIn * 1000);
+
               localStorage.setItem(STORAGE_KEY_AUTH_TOKEN, accessToken);
+              localStorage.setItem(STORAGE_KEY_TOKEN_EXPIRY, tokenExpiresAt.toString());
 
               const banner = document.getElementById('reconnectBanner');
               if (banner) banner.classList.add('hidden');
 
+              // Fetch User Profile if missing
               if (!userProfile) {
                 try {
                   const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -1340,6 +1365,14 @@
               }
 
               updateAuthUI(true);
+
+              while (pendingAuthQueue.length > 0) {
+                const queuedFn = pendingAuthQueue.shift();
+                if (typeof queuedFn === 'function') {
+                  try { queuedFn(); } catch(e) {}
+                }
+              }
+
               if (onSuccessCallback) onSuccessCallback();
             }
           }
@@ -1368,11 +1401,11 @@
         client.requestAccessToken({ prompt: promptUser ? '' : 'none' });
       } else {
         isRequestingToken = false;
-        showToast('Google client initializing, please retry...');
+        showToast('Google Client initializing, tap again in 2s');
       }
     }
 
-    // Safe Authenticated Fetch Wrapper
+    // Mobile-Resilient Authenticated Fetch
     async function authFetch(url, options = {}) {
       if (!options.headers) options.headers = {};
       if (accessToken) options.headers['Authorization'] = `Bearer ${accessToken}`;
@@ -1385,9 +1418,20 @@
       }
 
       if (res && res.status === 401) {
-        // Show non-blocking refresh banner instead of logging user out
         const banner = document.getElementById('reconnectBanner');
         if (banner) banner.classList.remove('hidden');
+
+        return new Promise((resolve) => {
+          pendingAuthQueue.push(async () => {
+            options.headers['Authorization'] = `Bearer ${accessToken}`;
+            try {
+              const retryRes = await fetch(url, options);
+              resolve(retryRes);
+            } catch(e) {
+              resolve(null);
+            }
+          });
+        });
       }
 
       return res;
@@ -1398,10 +1442,12 @@
         try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch(e) {}
       }
       accessToken = null;
+      tokenExpiresAt = 0;
       userProfile = null;
       isCloudHydrated = false;
 
       localStorage.removeItem(STORAGE_KEY_AUTH_TOKEN);
+      localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRY);
       localStorage.removeItem(STORAGE_KEY_AUTH_PROFILE);
 
       closeProfileMenu();
@@ -1552,7 +1598,6 @@
             if (!unlockedThemes.includes('default')) unlockedThemes.push('default');
           }
 
-          // Hydrate tasks from spreadsheet
           if (tableMap['Tasks_State_JSON']) {
             try {
               const cloudTasks = JSON.parse(tableMap['Tasks_State_JSON']);
@@ -1560,7 +1605,7 @@
                 tasks = cloudTasks.map(t => ({
                   id: t.id || ('task_' + Math.random().toString(36).slice(2, 7)),
                   title: t.title || 'Focus Task',
-                  elapsed: 0, // Reset for today; will be populated from today's logs below
+                  elapsed: 0,
                   isRunning: false,
                   lastStarted: null
                 }));
@@ -1590,7 +1635,6 @@
                 }
               }
 
-              // If tasks were somehow empty, reconstruct task cards from spreadsheet history
               if (tasks.length === 0 && uniqueHistoryTasks.size > 0) {
                 const names = Array.from(uniqueHistoryTasks).slice(0, 5);
                 tasks = names.map(name => ({
@@ -1620,7 +1664,6 @@
         updateTrophiesDisplay();
         applyWorkspaceTheme(activeTheme, customWallpaperUrl);
         updateSubscriptionTicker();
-        enforceSubscriptionCheck();
 
       } catch(err) {
       }
@@ -1815,6 +1858,14 @@
       const now = Date.now();
       let hasRunning = false;
 
+      // Auto-pause if plan expires mid-tracking
+      if (!isSubscriptionActive()) {
+        tasks.forEach(t => {
+          if (t.isRunning) pauseTask(t.id, false);
+        });
+        return;
+      }
+
       tasks.forEach(task => {
         if (task.isRunning && task.lastStarted) {
           hasRunning = true;
@@ -1845,7 +1896,6 @@
       updateHeroMetrics();
     }
 
-    // Pure Productive Focus Seconds (Excludes Rest & Timepass)
     function getProductiveFocusSecondsToday() {
       const now = Date.now();
       let total = 0;
@@ -1860,7 +1910,6 @@
       return total;
     }
 
-    // Total Overall Seconds (Includes Both Productive + Rest + Timepass)
     function getTotalFocusSecondsToday() {
       const now = Date.now();
       let total = 0;
@@ -1888,8 +1937,7 @@
 
     function toggleTask(id) {
       if (!isSubscriptionActive()) {
-        openUsageModal(true);
-        showToast('Active subscription required to start tasks');
+        showSubscriptionExpiredGate();
         return;
       }
 
@@ -1947,11 +1995,11 @@
       const isBreak = isBreakOrLeisureTask(task.title);
 
       if (task.isRunning) {
-        card.className = `glass-panel rounded-3xl p-5 transition-all duration-300 relative flex flex-col justify-between ${
+        card.className = `glass-panel rounded-3xl p-4 sm:p-5 transition-all duration-300 relative flex flex-col justify-between ${
           isBreak ? 'active-rest-glow bg-amber-50/80 border-amber-400' : 'active-slot-glow bg-emerald-50/80 border-emerald-400'
         }`;
       } else {
-        card.className = 'glass-panel rounded-3xl p-5 transition-all duration-300 relative flex flex-col justify-between hover:border-slate-300 shadow-xs';
+        card.className = 'glass-panel rounded-3xl p-4 sm:p-5 transition-all duration-300 relative flex flex-col justify-between hover:border-slate-300 shadow-xs';
       }
 
       const badge = document.getElementById(`badge-${task.id}`);
@@ -1969,7 +2017,7 @@
 
       const btn = document.getElementById(`btn-${task.id}`);
       if (btn) {
-        btn.className = `px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs ${
+        btn.className = `px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs ${
           task.isRunning
             ? 'bg-slate-800 hover:bg-slate-900 text-white'
             : isBreak ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -1991,6 +2039,11 @@
     // Permanent Task Creation
     // ----------------------------------------------------
     function addNewSlot() {
+      if (!isSubscriptionActive()) {
+        showSubscriptionExpiredGate();
+        return;
+      }
+
       if (tasks.length >= 5) {
         showToast('Maximum 5 focus slots allowed');
         return;
@@ -2005,6 +2058,12 @@
     }
 
     function confirmCreateNewTask() {
+      if (!isSubscriptionActive()) {
+        closeNewTaskModal();
+        showSubscriptionExpiredGate();
+        return;
+      }
+
       const input = document.getElementById('newTaskTitleInput');
       const cleanTitle = input.value.replace(/[\s\u00A0\u200B]+/g, ' ').replace(/[<>"/\\&]/g, '').trim().slice(0, 50);
 
@@ -2048,7 +2107,7 @@
 
         const card = document.createElement('div');
         card.id = `card-${task.id}`;
-        card.className = `glass-panel rounded-3xl p-5 transition-all duration-300 relative flex flex-col justify-between ${
+        card.className = `glass-panel rounded-3xl p-4 sm:p-5 transition-all duration-300 relative flex flex-col justify-between ${
           isRunning
             ? (isBreak ? 'active-rest-glow bg-amber-50/80 border-amber-400' : 'active-slot-glow bg-emerald-50/80 border-emerald-400')
             : 'hover:border-slate-300 shadow-xs'
@@ -2056,15 +2115,15 @@
 
         // Top Header
         const topRow = document.createElement('div');
-        topRow.className = 'flex items-center justify-between gap-2 mb-2';
+        topRow.className = 'flex items-center justify-between gap-2 mb-1.5 sm:mb-2';
 
         const titleDiv = document.createElement('div');
-        titleDiv.className = 'flex items-center gap-2 min-w-0';
+        titleDiv.className = 'flex items-center gap-1.5 sm:gap-2 min-w-0';
         titleDiv.innerHTML = `
-          <span class="text-sm font-extrabold text-slate-900 truncate">${escapeHtml(task.title)}</span>
+          <span class="text-xs sm:text-sm font-extrabold text-slate-900 truncate">${escapeHtml(task.title)}</span>
           ${isBreak
-            ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 uppercase tracking-wider flex-shrink-0">Rest / Leisure</span>'
-            : '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800 uppercase tracking-wider flex-shrink-0">Focus</span>'
+            ? '<span class="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 uppercase tracking-wider flex-shrink-0">Rest</span>'
+            : '<span class="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800 uppercase tracking-wider flex-shrink-0">Focus</span>'
           }
         `;
 
@@ -2072,11 +2131,11 @@
 
         // Analog SVG Clock Face (Anchor: 50,50)
         const clockArea = document.createElement('div');
-        clockArea.className = 'my-3 flex flex-col items-center justify-center';
+        clockArea.className = 'my-2 sm:my-3 flex flex-col items-center justify-center';
 
         const svgClock = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svgClock.setAttribute('viewBox', '0 0 100 100');
-        svgClock.setAttribute('class', `w-20 h-20 mb-2 drop-shadow-sm clock-dial-svg ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform`);
+        svgClock.setAttribute('class', `w-18 h-18 sm:w-20 sm:h-20 mb-1.5 sm:mb-2 drop-shadow-sm clock-dial-svg ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform`);
 
         const dialBg = isRunning ? (isBreak ? '#fffbeb' : '#f0fdf4') : '#ffffff';
         const dialBorder = isRunning ? (isBreak ? '#fbbf24' : '#34d399') : '#e2e8f0';
@@ -2116,7 +2175,7 @@
 
         // Card Bottom Controls
         const bottomRow = document.createElement('div');
-        bottomRow.className = 'mt-3 pt-3 border-t border-slate-100 flex items-center justify-between';
+        bottomRow.className = 'mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-between';
 
         const badge = document.createElement('span');
         badge.id = `badge-${task.id}`;
@@ -2132,7 +2191,7 @@
 
         const toggleBtn = document.createElement('button');
         toggleBtn.id = `btn-${task.id}`;
-        toggleBtn.className = `px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs ${
+        toggleBtn.className = `px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs ${
           isRunning
             ? 'bg-slate-800 hover:bg-slate-900 text-white'
             : isBreak ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -2155,11 +2214,11 @@
 
       if (tasks.length < 5) {
         const addCard = document.createElement('div');
-        addCard.className = 'border-2 border-dashed border-slate-200 hover:border-brand-400 rounded-3xl p-6 flex flex-col items-center justify-center cursor-pointer transition text-slate-400 hover:text-brand-600 group min-h-[170px] bg-slate-50/40';
+        addCard.className = 'border-2 border-dashed border-slate-200 hover:border-brand-400 rounded-3xl p-5 sm:p-6 flex flex-col items-center justify-center cursor-pointer transition text-slate-400 hover:text-brand-600 group min-h-[160px] sm:min-h-[170px] bg-slate-50/40 active:scale-95';
         addCard.onclick = addNewSlot;
         addCard.innerHTML = `
-          <div class="w-12 h-12 rounded-2xl bg-white shadow-xs group-hover:bg-brand-50 flex items-center justify-center text-slate-400 group-hover:text-brand-600 transition mb-2">
-            <i class="fa-solid fa-plus text-base"></i>
+          <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white shadow-xs group-hover:bg-brand-50 flex items-center justify-center text-slate-400 group-hover:text-brand-600 transition mb-2">
+            <i class="fa-solid fa-plus text-sm sm:text-base"></i>
           </div>
           <span class="text-xs font-extrabold">+ Add Focus Slot</span>
         `;
@@ -2176,7 +2235,6 @@
     // Points & Trophy Quotas (Pure Productive Focus Only)
     // ----------------------------------------------------
     function checkFocusHourPointsMilestone() {
-      // ONLY pure productive focus awards points (Rest/Timepass excluded)
       const productiveSeconds = getProductiveFocusSecondsToday();
       const currentFullHours = Math.floor(productiveSeconds / 3600);
 
@@ -2210,7 +2268,6 @@
     }
 
     function checkTrophyMilestones() {
-      // ONLY pure productive focus meets Trophy criteria (Rest/Timepass excluded)
       const productiveSeconds = getProductiveFocusSecondsToday();
       const hours = productiveSeconds / 3600;
 
@@ -2360,9 +2417,9 @@
       if (claimBtn && !isShopPurchasing) {
         claimBtn.disabled = !canClaim;
         if (canClaim) {
-          claimBtn.className = 'px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md shadow-amber-400/30 transition cursor-pointer';
+          claimBtn.className = 'w-full sm:w-auto px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md shadow-amber-400/30 transition cursor-pointer';
         } else {
-          claimBtn.className = 'px-5 py-3 rounded-2xl bg-slate-300 text-slate-500 font-black text-xs cursor-not-allowed';
+          claimBtn.className = 'w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-300 text-slate-500 font-black text-xs cursor-not-allowed';
         }
       }
     }
@@ -2475,7 +2532,7 @@
 
         updatePointsDisplay();
         updateSubscriptionTicker();
-        enforceSubscriptionCheck();
+        closeSubscriptionGate();
         await syncStateToSpreadsheet();
 
         showToast(`🎉 Redeemed! +${days} Days Pro added to your pass.`);
@@ -2673,7 +2730,6 @@
 
     async function handleMidnightBoundaryRollover() {
       const now = Date.now();
-      // ALL task slots retain their names and positions; ONLY today's elapsed seconds reset to 0
       for (const task of tasks) {
         if (task.isRunning && task.lastStarted) {
           const preMidnightSeconds = (now - task.lastStarted) / 1000;
@@ -2696,49 +2752,39 @@
     }
 
     // ----------------------------------------------------
-    // Usage & Subscription System
+    // Usage & Subscription System (Action-Triggered Model)
     // ----------------------------------------------------
     function isSubscriptionActive() {
       return subscriptionExpiry > Date.now();
     }
 
-    function enforceSubscriptionCheck() {
-      const expiredGate = document.getElementById('expiredSubscriptionGate');
+    function showSubscriptionExpiredGate() {
       const usageModal = document.getElementById('usageModal');
       const isUsageModalOpen = usageModal && !usageModal.classList.contains('hidden');
+      if (isUsageModalOpen) return;
 
-      if (!isSubscriptionActive()) {
-        tasks.forEach(t => {
-          if (t.isRunning) pauseTask(t.id, false);
-        });
-        if (!isUsageModalOpen && expiredGate) expiredGate.classList.remove('hidden');
-      } else {
-        if (expiredGate) expiredGate.classList.add('hidden');
+      const expiredGate = document.getElementById('expiredSubscriptionGate');
+      if (expiredGate) {
+        expiredGate.classList.remove('hidden');
       }
     }
 
+    function closeSubscriptionGate() {
+      const expiredGate = document.getElementById('expiredSubscriptionGate');
+      if (expiredGate) expiredGate.classList.add('hidden');
+    }
+
     function openUsageModal(forced = false) {
+      closeSubscriptionGate();
       const modal = document.getElementById('usageModal');
       const closeBtn = document.getElementById('closeUsageBtn');
-      const expiredGate = document.getElementById('expiredSubscriptionGate');
 
-      if (expiredGate) expiredGate.classList.add('hidden');
-      if (forced || !isSubscriptionActive()) {
-        if (closeBtn) closeBtn.classList.add('hidden');
-      } else {
-        if (closeBtn) closeBtn.classList.remove('hidden');
-      }
-
+      if (closeBtn) closeBtn.classList.remove('hidden');
       if (modal) modal.classList.remove('hidden');
       updateSubscriptionTicker();
     }
 
     function closeUsageModal() {
-      if (!isSubscriptionActive()) {
-        document.getElementById('usageModal').classList.add('hidden');
-        document.getElementById('expiredSubscriptionGate').classList.remove('hidden');
-        return;
-      }
       document.getElementById('usageModal').classList.add('hidden');
     }
 
@@ -2808,10 +2854,10 @@
       subscriptionExpiry = currentExpiry + (pendingPurchaseDays * 24 * 60 * 60 * 1000);
 
       closePlanCodeModal();
+      closeSubscriptionGate();
       showToast(`Plan activated! Added ${pendingPurchaseDays} days.`);
 
       updateSubscriptionTicker();
-      enforceSubscriptionCheck();
       syncStateToSpreadsheet();
       closeUsageModal();
     }
@@ -2858,8 +2904,8 @@
       ['daily', 'weekly', 'monthly'].forEach(r => {
         const btn = document.getElementById(`range${r.charAt(0).toUpperCase() + r.slice(1)}Btn`);
         if (btn) {
-          if (r === range) btn.className = 'px-3 py-1.5 rounded-lg bg-white shadow-xs text-brand-600 font-extrabold';
-          else btn.className = 'px-3 py-1.5 rounded-lg text-slate-600 font-semibold';
+          if (r === range) btn.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg bg-white shadow-xs text-brand-600 font-extrabold';
+          else btn.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg text-slate-600 font-semibold';
         }
       });
       processAndRenderAnalytics(cachedAnalyticsRows || []);
@@ -2997,7 +3043,7 @@
         type: 'bar',
         data: {
           labels: labels.length ? labels : ['No Data'],
-          datasets: [{ data: values.length ? values : [0], backgroundColor: palette, borderRadius: 10 }]
+          datasets: [{ data: values.length ? values : [0], backgroundColor: palette, borderRadius: 8 }]
         },
         options: {
           responsive: true,
@@ -3005,12 +3051,11 @@
           plugins: { legend: { display: false } },
           scales: {
             y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { family: '"JetBrains Mono"', size: 10 } } },
-            x: { grid: { display: false }, ticks: { font: { family: '"Plus Jakarta Sans"', size: 11, weight: '600' } } }
+            x: { grid: { display: false }, ticks: { font: { family: '"Plus Jakarta Sans"', size: 10, weight: '600' } } }
           }
         }
       });
 
-      // Pie Chart: Productive Focus vs. Rest/Timepass
       const hasData = (productiveMins + restMins) > 0;
       pieChartInstance = new Chart(pieCanvas.getContext('2d'), {
         type: 'doughnut',
@@ -3029,7 +3074,7 @@
           plugins: {
             legend: {
               position: 'bottom',
-              labels: { boxWidth: 10, padding: 14, font: { family: '"Plus Jakarta Sans"', size: 11, weight: '600' } }
+              labels: { boxWidth: 10, padding: 12, font: { family: '"Plus Jakarta Sans"', size: 10, weight: '600' } }
             }
           },
           cutout: '70%'
@@ -3052,7 +3097,7 @@
     }
 
     // ----------------------------------------------------
-    // Wake Lock & Audio Context
+    // Mobile-Resilient Wake Lock & Audio Context
     // ----------------------------------------------------
     async function activateWakeLock() {
       try {

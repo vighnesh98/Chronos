@@ -1070,6 +1070,7 @@
     const STORAGE_KEY_AUTH_PROFILE = 'chronos_auth_profile';
     const STORAGE_KEY_CLIENT_ID = 'chronos_client_id';
     const STORAGE_KEY_SHEET_ID = 'chronos_sheet_id';
+    const STORAGE_KEY_ACTIVE_SESSION = 'chronos_active_session';
 
     const PLAN_SECRET_CODE = '@@112267';
 
@@ -1185,6 +1186,7 @@
       dismissAllGatesOnBoot();
       loadSettingsInputs();
       initAuthSession();
+      restoreLocalSessionAnchor();
       renderTasks();
       updateHeroMetrics();
       updatePointsDisplay();
@@ -1205,7 +1207,7 @@
         await flushActiveTaskCheckpoints();
       }, 60000);
 
-      // Mobile sleep and background lifecycle listeners
+      // Mobile sleep, tab switch, and background lifecycle listeners
       const handleAppResume = () => {
         reconcileTimers();
         tickTimers();
@@ -1236,6 +1238,7 @@
 
       // Beacon on tab exit
       window.addEventListener('beforeunload', () => {
+        persistLocalSessionAnchor();
         if (sheetQueue.length > 0 && accessToken) {
           const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
           if (sheetId && navigator.sendBeacon) {
@@ -1250,6 +1253,74 @@
         await syncWithSpreadsheet();
       }
     });
+
+    // ----------------------------------------------------
+    // Continuous Local Session Persistence (Survives Reload & Close)
+    // ----------------------------------------------------
+    function persistLocalSessionAnchor() {
+      try {
+        const payload = {
+          date: getTodayString(),
+          tasks: tasks.map(t => ({
+            id: t.id,
+            title: t.title,
+            elapsed: t.elapsed,
+            isRunning: t.isRunning,
+            lastStarted: t.lastStarted
+          }))
+        };
+        localStorage.setItem(STORAGE_KEY_ACTIVE_SESSION, JSON.stringify(payload));
+      } catch(e) {}
+    }
+
+    function restoreLocalSessionAnchor() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_ACTIVE_SESSION);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.tasks)) return;
+
+        const today = getTodayString();
+        const now = Date.now();
+
+        // If from today, restore full state including running state & true elapsed time
+        if (data.date === today) {
+          tasks = data.tasks.map(t => {
+            let taskElapsed = parseFloat(t.elapsed) || 0;
+            let isRunning = Boolean(t.isRunning);
+            let lastStarted = t.lastStarted ? parseInt(t.lastStarted, 10) : null;
+
+            if (isRunning && lastStarted) {
+              const backgroundDelta = Math.max(0, (now - lastStarted) / 1000);
+              taskElapsed += backgroundDelta;
+              lastStarted = now; // re-anchor to current instant
+            }
+
+            return {
+              id: t.id,
+              title: t.title,
+              elapsed: taskElapsed,
+              isRunning: isRunning,
+              lastStarted: isRunning ? lastStarted : null
+            };
+          });
+
+          // Check if any task was running, activate lock
+          if (tasks.some(t => t.isRunning)) {
+            activateWakeLock();
+          }
+        } else {
+          // If past day, keep task names but reset elapsed
+          tasks = data.tasks.map(t => ({
+            id: t.id,
+            title: t.title,
+            elapsed: 0,
+            isRunning: false,
+            lastStarted: null
+          }));
+        }
+      } catch(e) {}
+    }
 
     function dismissAllGatesOnBoot() {
       const expiredGate = document.getElementById('expiredSubscriptionGate');
@@ -1602,13 +1673,21 @@
             try {
               const cloudTasks = JSON.parse(tableMap['Tasks_State_JSON']);
               if (Array.isArray(cloudTasks) && cloudTasks.length > 0) {
-                tasks = cloudTasks.map(t => ({
-                  id: t.id || ('task_' + Math.random().toString(36).slice(2, 7)),
-                  title: t.title || 'Focus Task',
-                  elapsed: 0,
-                  isRunning: false,
-                  lastStarted: null
-                }));
+                // Merge cloud slot titles without overwriting active running timers
+                const existingMap = new Map(tasks.map(t => [t.title, t]));
+                tasks = cloudTasks.map(t => {
+                  const existing = existingMap.get(t.title) || tasks.find(x => x.id === t.id);
+                  if (existing) {
+                    return existing;
+                  }
+                  return {
+                    id: t.id || ('task_' + Math.random().toString(36).slice(2, 7)),
+                    title: t.title || 'Focus Task',
+                    elapsed: 0,
+                    isRunning: false,
+                    lastStarted: null
+                  };
+                });
               }
             } catch(e) {}
           }
@@ -1647,8 +1726,10 @@
               }
 
               tasks.forEach(t => {
-                if (taskTotalsToday[t.title] !== undefined && !t.isRunning) {
-                  t.elapsed = taskTotalsToday[t.title];
+                const loggedSecs = taskTotalsToday[t.title] || 0;
+                // If not actively running and local elapsed is behind sheet logs, update from logs
+                if (!t.isRunning && loggedSecs > t.elapsed) {
+                  t.elapsed = loggedSecs;
                 }
               });
             }
@@ -1657,6 +1738,7 @@
 
         awardedHourlyPoints = Math.floor(getProductiveFocusSecondsToday() / 3600);
         isCloudHydrated = true;
+        persistLocalSessionAnchor();
 
         renderTasks();
         updateHeroMetrics();
@@ -1893,6 +1975,7 @@
           task.lastStarted = now;
         }
       });
+      persistLocalSessionAnchor();
       updateHeroMetrics();
     }
 
@@ -1955,6 +2038,7 @@
         task.lastStarted = Date.now();
 
         activateWakeLock();
+        persistLocalSessionAnchor();
         updateTaskCardInPlace(task);
         logTaskEventToSheets(task.title, 'Started', 0);
         syncStateToSpreadsheet();
@@ -1975,6 +2059,7 @@
       task.isRunning = false;
       task.lastStarted = null;
 
+      persistLocalSessionAnchor();
       updateTaskCardInPlace(task);
       updateHeroMetrics();
 
@@ -2085,6 +2170,7 @@
       });
 
       closeNewTaskModal();
+      persistLocalSessionAnchor();
       renderTasks();
       updateHeroMetrics();
       logTaskEventToSheets(cleanTitle, 'Created', 0);
@@ -2093,7 +2179,7 @@
     }
 
     // ----------------------------------------------------
-    // Render Task Cards with SVG Clocks
+    // Render Task Cards with SVG Clocks (Classic Clean Mobile Design)
     // ----------------------------------------------------
     function renderTasks() {
       clockElementCache.clear();
@@ -2120,10 +2206,10 @@
         const titleDiv = document.createElement('div');
         titleDiv.className = 'flex items-center gap-1.5 sm:gap-2 min-w-0';
         titleDiv.innerHTML = `
-          <span class="text-xs sm:text-sm font-extrabold text-slate-900 truncate">${escapeHtml(task.title)}</span>
+          <span class="text-sm sm:text-base font-extrabold text-slate-900 truncate">${escapeHtml(task.title)}</span>
           ${isBreak
-            ? '<span class="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 uppercase tracking-wider flex-shrink-0">Rest</span>'
-            : '<span class="text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800 uppercase tracking-wider flex-shrink-0">Focus</span>'
+            ? '<span class="text-[9px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 uppercase tracking-wider flex-shrink-0">Rest</span>'
+            : '<span class="text-[9px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 uppercase tracking-wider flex-shrink-0">Focus</span>'
           }
         `;
 
@@ -2135,7 +2221,7 @@
 
         const svgClock = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svgClock.setAttribute('viewBox', '0 0 100 100');
-        svgClock.setAttribute('class', `w-18 h-18 sm:w-20 sm:h-20 mb-1.5 sm:mb-2 drop-shadow-sm clock-dial-svg ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform`);
+        svgClock.setAttribute('class', `w-20 h-20 sm:w-24 sm:h-24 mb-1.5 sm:mb-2 drop-shadow-sm clock-dial-svg ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform`);
 
         const dialBg = isRunning ? (isBreak ? '#fffbeb' : '#f0fdf4') : '#ffffff';
         const dialBorder = isRunning ? (isBreak ? '#fbbf24' : '#34d399') : '#e2e8f0';
@@ -2145,10 +2231,10 @@
         svgClock.innerHTML = `
           <circle cx="50" cy="50" r="46" fill="${dialBg}" stroke="${dialBorder}" stroke-width="3.5"/>
           
-          <line x1="50" y1="8" x2="50" y2="14" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="92" y1="50" x2="86" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="50" y1="92" x2="50" y2="86" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="8" y1="50" x2="14" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="50" y1="8" x2="50" y2="15" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="92" y1="50" x2="85" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="50" y1="92" x2="50" y2="85" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="8" y1="50" x2="15" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
           
           <g id="clock-${task.id}-hour-group" class="clock-hand-group">
             <line x1="50" y1="50" x2="50" y2="28" stroke="${hourStroke}" stroke-width="3.8" stroke-linecap="round"/>
@@ -2160,7 +2246,7 @@
             <line x1="50" y1="50" x2="50" y2="13" stroke="#ef4444" stroke-width="1.6" stroke-linecap="round"/>
           </g>
           
-          <circle cx="50" cy="50" r="3.8" fill="${isRunning ? (isBreak ? '#d97706' : '#059669') : '#475569'}"/>
+          <circle cx="50" cy="50" r="4" fill="${isRunning ? (isBreak ? '#d97706' : '#059669') : '#475569'}"/>
         `;
 
         const timerText = document.createElement('div');

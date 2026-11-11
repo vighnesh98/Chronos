@@ -15,18 +15,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        const swScript = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>clients.claim());self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:200,headers:{'Content-Type':'text/plain'}})));});";
-        try {
-          const swDataUrl = 'data:application/javascript;base64,' + btoa(swScript);
-          navigator.serviceWorker.register(swDataUrl, { scope: './' }).catch(() => {});
-        } catch(e) {}
-      });
-    }
-  </script>
-
   <!-- Google Fonts & FontAwesome -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -100,20 +88,26 @@
     }
 
     .glass-panel {
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.88);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(226, 232, 240, 0.8);
+      border: 1px solid rgba(226, 232, 240, 0.85);
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .glass-panel:hover {
-      border-color: rgba(203, 213, 225, 0.9);
+      border-color: rgba(203, 213, 225, 0.95);
     }
 
     .active-slot-glow {
-      box-shadow: 0 16px 36px -8px rgba(16, 185, 129, 0.32), 0 8px 16px -6px rgba(16, 185, 129, 0.2);
+      box-shadow: 0 16px 36px -8px rgba(16, 185, 129, 0.35), 0 8px 16px -6px rgba(16, 185, 129, 0.2);
       border-color: rgba(52, 211, 153, 0.95) !important;
+      animation: floatGentle 3.5s ease-in-out infinite alternate;
+    }
+
+    .active-rest-glow {
+      box-shadow: 0 16px 36px -8px rgba(245, 158, 11, 0.35), 0 8px 16px -6px rgba(245, 158, 11, 0.2);
+      border-color: rgba(251, 191, 36, 0.95) !important;
       animation: floatGentle 3.5s ease-in-out infinite alternate;
     }
 
@@ -149,9 +143,6 @@
       border-color: rgba(51, 65, 85, 0.75) !important;
       color: #f1f5f9 !important;
     }
-    body.theme-midnight header, body.theme-midnight footer {
-      border-color: rgba(51, 65, 85, 0.6) !important;
-    }
 
     body.theme-forest {
       background-color: #051d14 !important;
@@ -183,18 +174,16 @@
   <div id="wallpaperBackdrop"></div>
   <canvas id="bubbleCanvas"></canvas>
 
-  <!-- Cloud Sync Loading Splash Screen (8-second max timeout guard) -->
-  <div id="cloudSyncLoader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-md text-white transition-opacity duration-300">
-    <div class="glass-panel p-8 rounded-3xl flex flex-col items-center max-w-sm w-full mx-4 text-center shadow-2xl border border-white/20">
-      <div class="relative w-16 h-16 mb-4 flex items-center justify-center">
-        <div class="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
-        <i class="fa-solid fa-cloud text-cyan-400 text-xl absolute"></i>
-      </div>
-      <h3 class="text-lg font-black text-slate-900 dark:text-white tracking-tight">Syncing Workspace</h3>
-      <p id="cloudSyncStatusText" class="text-xs text-slate-500 dark:text-slate-400 mt-2">
-        Connecting to Google Sheets...
-      </p>
+  <!-- Reconnect Floating Notification Bar -->
+  <div id="reconnectBanner" class="fixed top-3 left-1/2 -translate-x-1/2 z-[55] w-[92%] max-w-lg bg-slate-900/95 text-white backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center justify-between gap-3 hidden fade-enter">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0"></span>
+      <p class="text-xs font-semibold truncate">Google token refreshing. Click to confirm sync.</p>
     </div>
+    <button onclick="requestGoogleToken(true)" class="px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition flex-shrink-0">
+      <i class="fa-solid fa-arrows-rotate text-[10px]"></i>
+      <span>Refresh Sync</span>
+    </button>
   </div>
 
   <!-- Main Container -->
@@ -220,7 +209,7 @@
         </div>
       </div>
 
-      <!-- Right: Points Pill + Trophy Pill + Install + Avatar -->
+      <!-- Right: Points Pill + Trophy Pill + Avatar -->
       <div class="flex items-center gap-2">
         
         <!-- Live Chronos Points Pill -->
@@ -234,12 +223,6 @@
         <button onclick="openTrophyModal()" class="flex items-center gap-1.5 px-2.5 py-2 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200/90 transition shadow-xs group" title="Trophy Hall & Streaks">
           <i class="fa-solid fa-trophy text-purple-600 text-xs group-hover:scale-110 transition-transform"></i>
           <span id="headerTrophyCount" class="text-xs font-black font-mono">0</span>
-        </button>
-
-        <!-- PWA Install Button -->
-        <button id="pwaInstallBtn" class="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition border border-emerald-200 shadow-xs" onclick="promptPWAInstall()">
-          <i class="fa-solid fa-download"></i>
-          <span>Install</span>
         </button>
 
         <!-- Google Profile Button -->
@@ -257,8 +240,8 @@
           <!-- Popover Menu -->
           <div id="profileMenu" class="hidden absolute right-0 mt-2 w-60 rounded-3xl bg-white border border-slate-200/90 shadow-2xl p-3.5 z-50 fade-enter">
             <div class="border-b border-slate-100 pb-2.5 mb-2 px-1">
-              <p id="profileMenuName" class="text-xs font-black text-slate-900 truncate">Account</p>
-              <p id="profileMenuEmail" class="text-[11px] font-medium text-slate-500 truncate mt-0.5">user@gmail.com</p>
+              <p id="profileMenuName" class="text-xs font-black text-slate-900 truncate">Connected User</p>
+              <p id="profileMenuEmail" class="text-[11px] font-medium text-slate-500 truncate mt-0.5">Google Sheets Synced</p>
             </div>
             <button onclick="openCurrentSpreadsheet(); closeProfileMenu();" class="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-2xl flex items-center gap-2.5 transition">
               <i class="fa-solid fa-file-excel text-emerald-600"></i>
@@ -271,7 +254,7 @@
             <div class="border-t border-slate-100 my-1.5"></div>
             <button onclick="signOutUser()" class="w-full text-left px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-2xl flex items-center gap-2.5 transition">
               <i class="fa-solid fa-right-from-bracket"></i>
-              <span>Sign Out</span>
+              <span>Disconnect Google</span>
             </button>
           </div>
         </div>
@@ -337,51 +320,68 @@
       </div>
 
       <div class="pt-4 border-t border-slate-100 text-center">
-        <p class="text-[11px] font-medium text-slate-400">Chronos v3.11 &bull; Synced with Google Sheets</p>
+        <p class="text-[11px] font-medium text-slate-400">Chronos Focus Engine &bull; Strictly Cloud Authoritative</p>
       </div>
     </aside>
 
-    <!-- Command Center / Dashboard Widget -->
+    <!-- Command Center / Dashboard Widget (4 Cards: Focus, Total Today, Midnight Reset, Analytics) -->
     <div class="glass-panel p-3 sm:p-3.5 rounded-3xl shadow-sm border border-slate-200/90 mb-5">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         
-        <div class="bg-white/95 rounded-2xl p-3.5 border border-slate-100 flex items-center justify-between shadow-2xs">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm shadow-2xs">
+        <!-- Productive Focus Time (Meets Trophy/Points Quota) -->
+        <div class="bg-white/95 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xs shadow-2xs">
+              <i class="fa-solid fa-brain"></i>
+            </div>
+            <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 uppercase tracking-wider">Trophies</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Focus Time</span>
+            <p id="heroFocusTime" class="text-base sm:text-lg font-black font-mono text-slate-900 leading-tight">00:00:00</p>
+          </div>
+        </div>
+
+        <!-- Today's Total Time (Includes Timepass + Rest) -->
+        <div class="bg-white/95 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shadow-2xs">
               <i class="fa-solid fa-clock"></i>
             </div>
-            <div>
-              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Focus</span>
-              <p id="heroTotalTime" class="text-base sm:text-lg font-black font-mono text-slate-900 leading-tight">00:00:00</p>
-            </div>
+            <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 uppercase tracking-wider">All Tasks</span>
           </div>
-          <span class="text-[9px] font-black px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 uppercase tracking-wider">Today</span>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Today's Time</span>
+            <p id="heroTotalTime" class="text-base sm:text-lg font-black font-mono text-emerald-700 leading-tight">00:00:00</p>
+          </div>
         </div>
 
-        <div class="bg-white/95 rounded-2xl p-3.5 border border-slate-100 flex items-center justify-between shadow-2xs">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm shadow-2xs">
+        <!-- Midnight Reset Countdown -->
+        <div class="bg-white/95 rounded-2xl p-3 border border-slate-100 flex flex-col justify-between shadow-2xs">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xs shadow-2xs">
               <i class="fa-solid fa-hourglass-half"></i>
             </div>
-            <div>
-              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Midnight Reset</span>
-              <p id="heroResetCountdown" class="text-base sm:text-lg font-black font-mono text-amber-600 leading-tight">--:--:--</p>
-            </div>
+            <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 uppercase tracking-wider">Auto 00:00</span>
           </div>
-          <span class="text-[9px] font-black px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 uppercase tracking-wider">Auto</span>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Reset In</span>
+            <p id="heroResetCountdown" class="text-base sm:text-lg font-black font-mono text-amber-600 leading-tight">--:--:--</p>
+          </div>
         </div>
 
-        <div class="bg-gradient-to-r from-indigo-50/80 to-purple-50/80 rounded-2xl p-3.5 border border-indigo-100/90 flex items-center justify-between shadow-2xs cursor-pointer hover:border-indigo-300 transition group" onclick="openAnalyticsDashboardModal()">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-sm group-hover:scale-105 transition shadow-xs">
+        <!-- Visual Analytics Dashboard Trigger -->
+        <div class="bg-gradient-to-tr from-indigo-50/90 to-purple-50/90 rounded-2xl p-3 border border-indigo-100/90 flex flex-col justify-between shadow-2xs cursor-pointer hover:border-indigo-300 transition group" onclick="openAnalyticsDashboardModal()">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xs group-hover:scale-105 transition shadow-xs">
               <i class="fa-solid fa-chart-pie"></i>
             </div>
-            <div class="truncate">
-              <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-500 block">Analytics</span>
-              <p class="text-xs font-bold text-slate-800 truncate">Visual Insights</p>
-            </div>
+            <i class="fa-solid fa-arrow-right text-indigo-400 text-xs group-hover:translate-x-1 transition-transform"></i>
           </div>
-          <i class="fa-solid fa-chevron-right text-indigo-400 text-xs mr-1 group-hover:translate-x-1 transition-transform"></i>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-500 block">Insights</span>
+            <p class="text-xs font-bold text-slate-800 truncate">Dashboard</p>
+          </div>
         </div>
 
       </div>
@@ -413,12 +413,12 @@
       </div>
       <h4 class="text-base font-black text-slate-900">Name Your Focus Slot</h4>
       <p class="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
-        Once created, this slot title is permanent and locked to preserve your tracked focus history.
+        Slots named <strong>"Rest"</strong> or <strong>"Timepass"</strong> track overall time, but do not count toward Trophy quotas or focus points.
       </p>
 
       <div class="mb-5 text-left">
         <label for="newTaskTitleInput" class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Task Title</label>
-        <input type="text" id="newTaskTitleInput" placeholder="e.g. Deep Work, Study Physics" maxlength="50" class="w-full text-xs p-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:border-brand-500 text-slate-800 font-semibold transition" />
+        <input type="text" id="newTaskTitleInput" placeholder="e.g. Deep Work, Rest, Coding" maxlength="50" class="w-full text-xs p-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:border-brand-500 text-slate-800 font-semibold transition" />
       </div>
 
       <div class="flex gap-2.5">
@@ -444,7 +444,7 @@
       </span>
       <h3 id="trophyModalTitle" class="text-xl font-black text-slate-900 mt-2">Bronze Trophy Ready!</h3>
       <p id="trophyModalDesc" class="text-xs text-slate-500 mt-1 mb-6 leading-relaxed">
-        You've surpassed 4 hours of dedicated focus today. Collect your daily trophy now!
+        You've surpassed 4 hours of pure focus time today. Collect your daily trophy now!
       </p>
       <button id="trophyClaimActionBtn" onclick="confirmClaimDailyTrophy()" class="w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg transition">
         <i class="fa-solid fa-trophy text-amber-400"></i>
@@ -453,7 +453,7 @@
     </div>
   </div>
 
-  <!-- Consolidated Focus Points Multi-Hour Reward Modal -->
+  <!-- Focus Points Multi-Hour Reward Modal -->
   <div id="pointsEarnedModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 hidden">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter relative overflow-hidden">
       <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-400 to-yellow-500 text-white mx-auto flex items-center justify-center text-3xl shadow-xl shadow-amber-500/25 mb-4 animate-bounce">
@@ -699,7 +699,7 @@
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold text-slate-700 flex items-center gap-2">
               <i class="fa-solid fa-gem text-cyan-500"></i>
-              <span>Diamond Trophy Streak (8h / Day for 56 Days)</span>
+              <span>Diamond Trophy Streak (8h Pure Focus / Day for 56 Days)</span>
             </span>
             <span id="streakCountDisplay" class="text-xs font-black font-mono text-cyan-700">0 / 56 Days</span>
           </div>
@@ -715,7 +715,7 @@
               <i class="fa-solid fa-award"></i>
             </div>
             <h5 class="text-xs font-black text-slate-900">Bronze Trophy</h5>
-            <p class="text-[10px] text-slate-500 mt-0.5">4 Hours / Day</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">4 Hours Pure Focus</p>
             <div class="mt-3 w-full py-1.5 rounded-xl bg-amber-200/60 text-amber-900 font-black text-xs">
               <span id="trophyCount-bronze">0</span> Owned
             </div>
@@ -726,7 +726,7 @@
               <i class="fa-solid fa-medal"></i>
             </div>
             <h5 class="text-xs font-black text-slate-900">Silver Trophy</h5>
-            <p class="text-[10px] text-slate-500 mt-0.5">8 Hours / Day</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">8 Hours Pure Focus</p>
             <div class="mt-3 w-full py-1.5 rounded-xl bg-slate-200 text-slate-800 font-black text-xs">
               <span id="trophyCount-silver">0</span> Owned
             </div>
@@ -737,7 +737,7 @@
               <i class="fa-solid fa-crown"></i>
             </div>
             <h5 class="text-xs font-black text-slate-900">Golden Trophy</h5>
-            <p class="text-[10px] text-slate-500 mt-0.5">15 Hours / Day</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">15 Hours Pure Focus</p>
             <div class="mt-3 w-full py-1.5 rounded-xl bg-yellow-200 text-yellow-900 font-black text-xs">
               <span id="trophyCount-golden">0</span> Owned
             </div>
@@ -788,9 +788,9 @@
             <span class="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse"></span>
             System Status
           </span>
-          <h4 id="usagePlanStatus" class="text-lg sm:text-xl font-black text-slate-900 mt-1">Checking Status...</h4>
+          <h4 id="usagePlanStatus" class="text-lg sm:text-xl font-black text-slate-900 mt-1">Active Plan</h4>
           <p id="usageStatusMessage" class="text-xs text-slate-500 mt-1 max-w-sm">
-            Activate a tier below or redeem points in the shop to unlock active stopwatch timers.
+            Activate a tier below or redeem points in the shop to maintain stopwatch timers.
           </p>
         </div>
 
@@ -903,8 +903,8 @@
             <i class="fa-solid fa-chart-pie text-base"></i>
           </div>
           <div>
-            <h3 class="text-sm sm:text-base font-extrabold text-slate-900">Focus Analytics</h3>
-            <p class="text-[11px] text-slate-400">Stream from Google Sheets Task_Logs</p>
+            <h3 class="text-sm sm:text-base font-extrabold text-slate-900">Focus & Rest Analytics</h3>
+            <p class="text-[11px] text-slate-400">Streamed live from Google Sheets Task_Logs</p>
           </div>
         </div>
 
@@ -928,24 +928,27 @@
 
       <div id="analyticsExportContainer" class="p-6 overflow-y-auto flex-grow space-y-5 bg-slate-50/40">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          
           <div class="bg-white p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
             <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Duration Tracked</span>
-              <p id="modalFilteredDuration" class="text-xl font-black font-mono text-slate-900 mt-1">0h 0m</p>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pure Focus (Quota)</span>
+              <p id="modalFilteredDuration" class="text-xl font-black font-mono text-blue-600 mt-1">0h 0m</p>
             </div>
             <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
-              <i class="fa-solid fa-stopwatch"></i>
+              <i class="fa-solid fa-brain"></i>
             </div>
           </div>
+
           <div class="bg-white p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
             <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Spreadsheet Logs</span>
-              <p id="modalLogCount" class="text-xl font-black font-mono text-emerald-600 mt-1">0</p>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Tracked Time</span>
+              <p id="modalTotalDuration" class="text-xl font-black font-mono text-emerald-600 mt-1">0h 0m</p>
             </div>
             <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
-              <i class="fa-solid fa-table-list"></i>
+              <i class="fa-solid fa-clock"></i>
             </div>
           </div>
+
           <div class="bg-white p-4 rounded-3xl border border-slate-200/80 flex items-center justify-between">
             <div class="truncate mr-2">
               <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Top Focus Area</span>
@@ -955,6 +958,7 @@
               <i class="fa-solid fa-medal"></i>
             </div>
           </div>
+
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -965,7 +969,7 @@
             </div>
           </div>
           <div class="bg-white p-5 rounded-3xl border border-slate-200/80 flex flex-col">
-            <span class="text-xs font-bold text-slate-800 mb-2">Focus Allocation Share</span>
+            <span class="text-xs font-bold text-slate-800 mb-2">Focus vs. Rest Share</span>
             <div class="w-full h-56 relative flex items-center justify-center">
               <canvas id="analyticsPieChart"></canvas>
             </div>
@@ -1004,15 +1008,15 @@
     </div>
   </div>
 
-  <!-- Mandatory Auth Gate Modal (z-50) -->
+  <!-- Mandatory Auth Gate Modal (Only on cold boot if never configured) -->
   <div id="mandatoryAuthGate" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 hidden">
     <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 fade-enter">
       <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-brand-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-xl shadow-brand-500/25 mb-4">
         <i class="fa-solid fa-lock"></i>
       </div>
-      <h3 class="text-lg font-black text-slate-900">Sign In to Chronos</h3>
+      <h3 class="text-lg font-black text-slate-900">Connect Google Sheets</h3>
       <p class="text-xs text-slate-500 mt-1 mb-6 leading-relaxed">
-        Connect your Google Account to automatically stream and sync session logs to your Google Sheets.
+        Link your Google account to log sessions, earn trophies, and track your focus analytics.
       </p>
 
       <button onclick="requestGoogleToken(true)" class="w-full py-3.5 px-4 rounded-2xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center justify-center gap-3 shadow-lg transition">
@@ -1057,10 +1061,9 @@
   <!-- Application Logic -->
   <script>
     // ----------------------------------------------------
-    // State & Persistent Storage Keys
+    // State Keys & Configuration
     // ----------------------------------------------------
     const STORAGE_KEY_AUTH_TOKEN = 'chronos_access_token';
-    const STORAGE_KEY_AUTH_EXPIRY = 'chronos_token_expiry';
     const STORAGE_KEY_AUTH_PROFILE = 'chronos_auth_profile';
     const STORAGE_KEY_CLIENT_ID = 'chronos_client_id';
     const STORAGE_KEY_SHEET_ID = 'chronos_sheet_id';
@@ -1068,12 +1071,9 @@
     const PLAN_SECRET_CODE = '@@112267';
 
     let accessToken = null;
-    let tokenExpiration = 0;
     let userProfile = null;
     let tokenClient = null;
     let isRequestingToken = false;
-    let isSilentRenewing = false;
-    let deferredPrompt = null;
     let wakeLock = null;
     let audioContext = null;
     let silentOscillator = null;
@@ -1082,7 +1082,7 @@
     let pendingPurchaseDays = 0;
     let tasks = [];
 
-    // Version 3 Gamification State
+    // Gamification State
     let userPoints = 0;
     let activeTheme = 'default';
     let customWallpaperUrl = '';
@@ -1096,13 +1096,12 @@
     let bumperClaimCount = 0;
 
     let awardedHourlyPoints = 0;
-    
     let trophiesClaimDate = '';
     let trophiesClaimedToday = [];
     let pendingTrophyToClaim = null;
     let lastTrackedDate = '';
 
-    // MASTER LOCKS & PERFORMANCE BUFFERS
+    // Master Read/Write & Sync Locks
     let WRITE_PERMISSION_GRANTED = false;
     let isCloudHydrated = false;
     let isStateSyncing = false;
@@ -1118,6 +1117,15 @@
     let currentAnalyticsRange = 'daily';
     let cachedAnalyticsRows = null;
     let dashboardPollingInterval = null;
+
+    // ----------------------------------------------------
+    // Helper: Identify Non-Productive / Break Tasks
+    // ----------------------------------------------------
+    function isBreakOrLeisureTask(title) {
+      if (!title) return false;
+      const lower = title.toLowerCase().trim();
+      return /^(rest|timepass|break|leisure|relax|chill|sleep|nap|recess|idle)/i.test(lower);
+    }
 
     // ----------------------------------------------------
     // Background Particles
@@ -1162,7 +1170,7 @@
     animateBubbles();
 
     // ----------------------------------------------------
-    // Safe App Initialization
+    // Application Initialization
     // ----------------------------------------------------
     window.addEventListener('load', async () => {
       WRITE_PERMISSION_GRANTED = false;
@@ -1177,9 +1185,7 @@
       updatePointsDisplay();
       updateTrophiesDisplay();
       applyWorkspaceTheme(activeTheme, customWallpaperUrl);
-
-      // Safe fallback timeout for loader (Audit Item 18)
-      setTimeout(() => { hideSyncLoader(); }, 8000);
+      updateSubscriptionTicker();
 
       setInterval(() => {
         tickTimers();
@@ -1187,22 +1193,15 @@
         updateSubscriptionTicker();
       }, 500);
 
-      // 60-Second flush checkpoint
+      // Periodic checkpoint log every 60 seconds
       setInterval(async () => {
-        if (!WRITE_PERMISSION_GRANTED || !accessToken || !isCloudHydrated || !isSubscriptionActive()) return;
+        if (!WRITE_PERMISSION_GRANTED || !accessToken || !isSubscriptionActive()) return;
         await flushActiveTaskCheckpoints();
       }, 60000);
 
-      // Proactive silent token refresh every 60 seconds
-      setInterval(() => {
-        verifyAndRefreshGoogleToken();
-      }, 60000);
-
-      // Tab recovery hooks (Audit Item 20)
       const handleAppResume = () => {
         reconcileTimers();
         tickTimers();
-        verifyAndRefreshGoogleToken();
         if (isCloudHydrated) enforceSubscriptionCheck();
       };
 
@@ -1212,7 +1211,6 @@
       window.addEventListener('pageshow', handleAppResume);
       window.addEventListener('focus', handleAppResume);
 
-      // Global ESC key listener to safely close modals (Audit Item 14)
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           closeAnalyticsDashboardModal();
@@ -1225,7 +1223,7 @@
         }
       });
 
-      // Beacon with token appended to query param (Audit Item 1)
+      // Beacon on tab exit
       window.addEventListener('beforeunload', () => {
         if (sheetQueue.length > 0 && accessToken) {
           const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
@@ -1239,8 +1237,6 @@
 
       if (accessToken) {
         await syncWithSpreadsheet();
-      } else {
-        hideSyncLoader();
       }
     });
 
@@ -1249,24 +1245,11 @@
       if (expiredGate) expiredGate.classList.add('hidden');
     }
 
-    function showSyncLoader(msg) {
-      const loader = document.getElementById('cloudSyncLoader');
-      const text = document.getElementById('cloudSyncStatusText');
-      if (text && msg) text.textContent = msg;
-      if (loader) loader.classList.remove('hidden');
-    }
-
-    function hideSyncLoader() {
-      const loader = document.getElementById('cloudSyncLoader');
-      if (loader) loader.classList.add('hidden');
-    }
-
     // ----------------------------------------------------
-    // Fortified Multi-Layer Authentication & Silent Token Renewal
+    // Permanent Auth Session (Never Revoke Automatically)
     // ----------------------------------------------------
     function initAuthSession() {
       const savedToken = localStorage.getItem(STORAGE_KEY_AUTH_TOKEN);
-      const savedExpiry = parseInt(localStorage.getItem(STORAGE_KEY_AUTH_EXPIRY), 10) || 0;
       const rawProfile = localStorage.getItem(STORAGE_KEY_AUTH_PROFILE);
 
       if (rawProfile) {
@@ -1275,9 +1258,7 @@
 
       if (savedToken) {
         accessToken = savedToken;
-        tokenExpiration = savedExpiry;
         updateAuthUI(true);
-        verifyAndRefreshGoogleToken();
       } else {
         updateAuthUI(false);
       }
@@ -1296,19 +1277,27 @@
           avatarImg.src = (userProfile && userProfile.picture) ? userProfile.picture : 'https://placehold.co/100x100/2563eb/ffffff.png?text=U';
         }
         if (userProfile) {
-          document.getElementById('profileMenuName').textContent = userProfile.name || 'Account';
-          document.getElementById('profileMenuEmail').textContent = userProfile.email || '';
+          document.getElementById('profileMenuName').textContent = userProfile.name || 'Connected User';
+          document.getElementById('profileMenuEmail').textContent = userProfile.email || 'Google Sheets Synced';
         }
       } else {
-        if (gate) gate.classList.remove('hidden');
+        const hasConfig = localStorage.getItem(STORAGE_KEY_SHEET_ID) || localStorage.getItem(STORAGE_KEY_CLIENT_ID);
+        if (gate && !hasConfig) {
+          gate.classList.remove('hidden');
+        } else if (gate) {
+          gate.classList.add('hidden');
+        }
         if (gIcon) gIcon.classList.remove('hidden');
         if (avatarImg) avatarImg.classList.add('hidden');
       }
     }
 
     function handleAuthButtonClick() {
-      if (accessToken) toggleProfileMenu();
-      else requestGoogleToken(true);
+      if (accessToken) {
+        toggleProfileMenu();
+      } else {
+        requestGoogleToken(true);
+      }
     }
 
     function getOrCreateTokenClient(onSuccessCallback) {
@@ -1321,26 +1310,22 @@
           client_id: cid,
           scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
           error_callback: () => {
-            isSilentRenewing = false;
             isRequestingToken = false;
           },
           callback: async (resp) => {
             isRequestingToken = false;
-            isSilentRenewing = false;
 
             if (resp && resp.error) {
-              if (resp.error === 'interaction_required') {
-                showToast('Google session refresh required. Tap profile to reconnect.');
-              }
+              showToast('Google session refresh postponed');
               return;
             }
 
             if (resp && resp.access_token) {
               accessToken = resp.access_token;
-              tokenExpiration = Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000;
-              
               localStorage.setItem(STORAGE_KEY_AUTH_TOKEN, accessToken);
-              localStorage.setItem(STORAGE_KEY_AUTH_EXPIRY, String(tokenExpiration));
+
+              const banner = document.getElementById('reconnectBanner');
+              if (banner) banner.classList.add('hidden');
 
               if (!userProfile) {
                 try {
@@ -1375,7 +1360,7 @@
       isRequestingToken = true;
 
       const client = getOrCreateTokenClient(async () => {
-        showToast('Signed in successfully');
+        showToast('Google Sheets synchronized');
         await syncWithSpreadsheet();
       });
 
@@ -1383,24 +1368,11 @@
         client.requestAccessToken({ prompt: promptUser ? '' : 'none' });
       } else {
         isRequestingToken = false;
-        showToast('Google Services initializing, please retry...');
+        showToast('Google client initializing, please retry...');
       }
     }
 
-    async function verifyAndRefreshGoogleToken() {
-      if (!accessToken || !navigator.onLine) return;
-      const timeLeft = tokenExpiration - Date.now();
-
-      if (timeLeft <= 600000 && !isSilentRenewing) { // 10 minutes
-        const client = getOrCreateTokenClient(() => {});
-        if (client) {
-          isSilentRenewing = true;
-          client.requestAccessToken({ prompt: 'none' });
-        }
-      }
-    }
-
-    // Auth fetch with single-retry recursion latch (Audit Item 10)
+    // Safe Authenticated Fetch Wrapper
     async function authFetch(url, options = {}) {
       if (!options.headers) options.headers = {};
       if (accessToken) options.headers['Authorization'] = `Bearer ${accessToken}`;
@@ -1412,17 +1384,10 @@
         return null;
       }
 
-      if (res && res.status === 401 && !options._retryCount) {
-        options._retryCount = 1;
-        await verifyAndRefreshGoogleToken();
-        if (accessToken) {
-          options.headers['Authorization'] = `Bearer ${accessToken}`;
-          try {
-            res = await fetch(url, options);
-          } catch(e) {
-            return null;
-          }
-        }
+      if (res && res.status === 401) {
+        // Show non-blocking refresh banner instead of logging user out
+        const banner = document.getElementById('reconnectBanner');
+        if (banner) banner.classList.remove('hidden');
       }
 
       return res;
@@ -1433,42 +1398,35 @@
         try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch(e) {}
       }
       accessToken = null;
-      tokenExpiration = 0;
       userProfile = null;
       isCloudHydrated = false;
 
       localStorage.removeItem(STORAGE_KEY_AUTH_TOKEN);
-      localStorage.removeItem(STORAGE_KEY_AUTH_EXPIRY);
       localStorage.removeItem(STORAGE_KEY_AUTH_PROFILE);
 
       closeProfileMenu();
       updateAuthUI(false);
-      showToast('Signed out successfully');
+      showToast('Disconnected from Google Drive');
     }
 
     function toggleProfileMenu() { document.getElementById('profileMenu').classList.toggle('hidden'); }
     function closeProfileMenu() { document.getElementById('profileMenu').classList.add('hidden'); }
 
     // ----------------------------------------------------
-    // Spreadsheet Sync Engine (Dynamic Row Mapping)
+    // Spreadsheet Sync Engine (Pure Cloud Authoritative)
     // ----------------------------------------------------
     async function syncWithSpreadsheet() {
-      if (!accessToken) { hideSyncLoader(); return; }
-      showSyncLoader('Loading cloud state...');
+      if (!accessToken) return;
       try {
         await ensureSpreadsheetExists();
         await pullStateFromSpreadsheet();
-      } catch(e) {
-      } finally {
-        hideSyncLoader();
-      }
+      } catch(e) {}
     }
 
     async function ensureSpreadsheetExists() {
       if (!accessToken) return null;
       let sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
 
-      // Trashed spreadsheet check & recovery (Audit Item 16)
       if (sheetId) {
         try {
           const res = await authFetch(`https://www.googleapis.com/drive/v3/files/${sheetId}?fields=id,trashed`);
@@ -1594,17 +1552,24 @@
             if (!unlockedThemes.includes('default')) unlockedThemes.push('default');
           }
 
+          // Hydrate tasks from spreadsheet
           if (tableMap['Tasks_State_JSON']) {
             try {
               const cloudTasks = JSON.parse(tableMap['Tasks_State_JSON']);
-              if (Array.isArray(cloudTasks)) {
-                tasks = cloudTasks;
+              if (Array.isArray(cloudTasks) && cloudTasks.length > 0) {
+                tasks = cloudTasks.map(t => ({
+                  id: t.id || ('task_' + Math.random().toString(36).slice(2, 7)),
+                  title: t.title || 'Focus Task',
+                  elapsed: 0, // Reset for today; will be populated from today's logs below
+                  isRunning: false,
+                  lastStarted: null
+                }));
               }
             } catch(e) {}
           }
         }
 
-        // Reconcile task elapsed times with today's logged intervals
+        // Reconcile task elapsed times with today's logged intervals in Task_Logs
         try {
           const todayStr = getTodayString();
           const resLogs = await authFetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A2:G`);
@@ -1612,11 +1577,29 @@
             const dataLogs = await resLogs.json();
             if (dataLogs.values && Array.isArray(dataLogs.values)) {
               const taskTotalsToday = {};
+              const uniqueHistoryTasks = new Set();
+
               for (const r of dataLogs.values) {
-                if (r[1] === todayStr && r[4]) {
+                if (!r || !r[4]) continue;
+                const taskName = r[4].trim();
+                uniqueHistoryTasks.add(taskName);
+
+                if (r[1] === todayStr) {
                   const durationMins = parseFloat(r[6]) || 0;
-                  taskTotalsToday[r[4]] = (taskTotalsToday[r[4]] || 0) + (durationMins * 60);
+                  taskTotalsToday[taskName] = (taskTotalsToday[taskName] || 0) + (durationMins * 60);
                 }
+              }
+
+              // If tasks were somehow empty, reconstruct task cards from spreadsheet history
+              if (tasks.length === 0 && uniqueHistoryTasks.size > 0) {
+                const names = Array.from(uniqueHistoryTasks).slice(0, 5);
+                tasks = names.map(name => ({
+                  id: 'task_' + Math.random().toString(36).slice(2, 7),
+                  title: name,
+                  elapsed: 0,
+                  isRunning: false,
+                  lastStarted: null
+                }));
               }
 
               tasks.forEach(t => {
@@ -1628,9 +1611,7 @@
           }
         } catch(e) {}
 
-        // Hourly points baseline initialization
-        awardedHourlyPoints = Math.floor(getTotalFocusSecondsToday() / 3600);
-
+        awardedHourlyPoints = Math.floor(getProductiveFocusSecondsToday() / 3600);
         isCloudHydrated = true;
 
         renderTasks();
@@ -1642,13 +1623,11 @@
         enforceSubscriptionCheck();
 
       } catch(err) {
-      } finally {
-        hideSyncLoader();
       }
     }
 
     async function syncStateToSpreadsheet() {
-      if (!WRITE_PERMISSION_GRANTED || !isCloudHydrated) return;
+      if (!WRITE_PERMISSION_GRANTED) return;
 
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
       if (!sheetId || !accessToken || isStateSyncing) return;
@@ -1676,13 +1655,12 @@
           'Active_Theme': activeTheme,
           'Custom_Wallpaper_Url': customWallpaperUrl,
           'Unlocked_Themes': unlockedThemes.join(','),
-          'Tasks_State_JSON': JSON.stringify(tasks),
+          'Tasks_State_JSON': JSON.stringify(tasks.map(t => ({ id: t.id, title: t.title }))),
           'Last_Cloud_Sync': new Date().toISOString()
         };
 
         const finalRows = [];
         finalRows.push(['Setting / Metric', 'Value / Configuration']);
-
         const writtenKeys = new Set();
 
         for (let i = 1; i < currentRows.length; i++) {
@@ -1710,7 +1688,6 @@
       }
     }
 
-    // Precise ISO Week Calculation (Audit Item 11)
     function getISOWeekNumber(d) {
       const target = new Date(d.valueOf());
       const dayNr = (d.getDay() + 6) % 7;
@@ -1724,8 +1701,6 @@
     }
 
     async function logTaskEventToSheets(taskName, eventType, sessionMins) {
-      if (!WRITE_PERMISSION_GRANTED || !isCloudHydrated) return;
-
       const now = new Date();
       const dateStr = getTodayString();
       const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -1855,10 +1830,8 @@
       }
 
       updateHeroMetrics();
-      if (isCloudHydrated) {
-        checkFocusHourPointsMilestone();
-        checkTrophyMilestones();
-      }
+      checkFocusHourPointsMilestone();
+      checkTrophyMilestones();
     }
 
     function reconcileTimers() {
@@ -1872,6 +1845,22 @@
       updateHeroMetrics();
     }
 
+    // Pure Productive Focus Seconds (Excludes Rest & Timepass)
+    function getProductiveFocusSecondsToday() {
+      const now = Date.now();
+      let total = 0;
+      tasks.forEach(t => {
+        if (!isBreakOrLeisureTask(t.title)) {
+          total += t.elapsed;
+          if (t.isRunning && t.lastStarted) {
+            total += (now - t.lastStarted) / 1000;
+          }
+        }
+      });
+      return total;
+    }
+
+    // Total Overall Seconds (Includes Both Productive + Rest + Timepass)
     function getTotalFocusSecondsToday() {
       const now = Date.now();
       let total = 0;
@@ -1885,27 +1874,19 @@
     }
 
     function updateHeroMetrics() {
-      const total = getTotalFocusSecondsToday();
-      const heroEl = document.getElementById('heroTotalTime');
-      if (heroEl) heroEl.textContent = formatTime(total);
+      const productiveSeconds = getProductiveFocusSecondsToday();
+      const allSeconds = getTotalFocusSecondsToday();
+
+      const heroFocusEl = document.getElementById('heroFocusTime');
+      const heroTotalEl = document.getElementById('heroTotalTime');
+      if (heroFocusEl) heroFocusEl.textContent = formatTime(productiveSeconds);
+      if (heroTotalEl) heroTotalEl.textContent = formatTime(allSeconds);
 
       const countBadge = document.getElementById('slotCountBadge');
       if (countBadge) countBadge.textContent = `${tasks.length} / 5 slots`;
     }
 
-    function requireAuth() {
-      if (!accessToken) {
-        const gate = document.getElementById('mandatoryAuthGate');
-        if (gate) gate.classList.remove('hidden');
-        showToast('Please sign in with Google to continue');
-        return false;
-      }
-      return true;
-    }
-
     function toggleTask(id) {
-      if (!requireAuth()) return;
-
       if (!isSubscriptionActive()) {
         openUsageModal(true);
         showToast('Active subscription required to start tasks');
@@ -1925,7 +1906,6 @@
         task.isRunning = true;
         task.lastStarted = Date.now();
 
-        // AudioContext inside synchronous click event (Audit Item 4)
         activateWakeLock();
         updateTaskCardInPlace(task);
         logTaskEventToSheets(task.title, 'Started', 0);
@@ -1964,26 +1944,35 @@
         return;
       }
 
+      const isBreak = isBreakOrLeisureTask(task.title);
+
       if (task.isRunning) {
-        card.className = 'glass-panel rounded-3xl p-5 transition-all duration-300 relative flex flex-col justify-between active-slot-glow bg-emerald-50/80 border-emerald-400';
+        card.className = `glass-panel rounded-3xl p-5 transition-all duration-300 relative flex flex-col justify-between ${
+          isBreak ? 'active-rest-glow bg-amber-50/80 border-amber-400' : 'active-slot-glow bg-emerald-50/80 border-emerald-400'
+        }`;
       } else {
         card.className = 'glass-panel rounded-3xl p-5 transition-all duration-300 relative flex flex-col justify-between hover:border-slate-300 shadow-xs';
       }
 
       const badge = document.getElementById(`badge-${task.id}`);
       if (badge) {
-        badge.className = `text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
-          task.isRunning ? 'bg-emerald-100 text-emerald-800 animate-pulse' : 'bg-slate-100 text-slate-500'
-        }`;
-        badge.textContent = task.isRunning ? 'FOCUSING' : 'IDLE';
+        if (task.isRunning) {
+          badge.className = `text-[10px] font-extrabold px-2.5 py-1 rounded-full animate-pulse ${
+            isBreak ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+          }`;
+          badge.textContent = isBreak ? 'RESTING' : 'FOCUSING';
+        } else {
+          badge.className = 'text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500';
+          badge.textContent = 'IDLE';
+        }
       }
 
       const btn = document.getElementById(`btn-${task.id}`);
       if (btn) {
         btn.className = `px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs ${
           task.isRunning
-            ? 'bg-amber-500 hover:bg-amber-600 text-white'
-            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+            ? 'bg-slate-800 hover:bg-slate-900 text-white'
+            : isBreak ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
         }`;
         btn.innerHTML = task.isRunning
           ? '<i class="fa-solid fa-pause"></i><span>Pause</span>'
@@ -1993,16 +1982,15 @@
       const timerText = document.getElementById(`timer-${task.id}`);
       if (timerText) {
         timerText.className = `text-2xl sm:text-3xl font-black font-mono tracking-tight mt-1 ${
-          task.isRunning ? 'text-emerald-700' : 'text-slate-800'
+          task.isRunning ? (isBreak ? 'text-amber-700' : 'text-emerald-700') : 'text-slate-800'
         }`;
       }
     }
 
     // ----------------------------------------------------
-    // Permanent Task Creation (Audit Items 15 & 17)
+    // Permanent Task Creation
     // ----------------------------------------------------
     function addNewSlot() {
-      if (!requireAuth()) return;
       if (tasks.length >= 5) {
         showToast('Maximum 5 focus slots allowed');
         return;
@@ -2018,10 +2006,9 @@
 
     function confirmCreateNewTask() {
       const input = document.getElementById('newTaskTitleInput');
-      // Sanitize unicode whitespace & non-breaking spaces
       const cleanTitle = input.value.replace(/[\s\u00A0\u200B]+/g, ' ').replace(/[<>"/\\&]/g, '').trim().slice(0, 50);
 
-      if (!cleanTitle || cleanTitle.length < 2 || /^(task\s*\d*|slot\s*\d*|untitled.*|new\s*task)$/i.test(cleanTitle)) {
+      if (!cleanTitle || cleanTitle.length < 2) {
         showToast('Please enter a descriptive custom name');
         input.focus();
         return;
@@ -2029,9 +2016,8 @@
 
       WRITE_PERMISSION_GRANTED = true;
 
-      // Cryptographically unique ID (Audit Item 17)
       const newId = 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-      tasks.unshift({
+      tasks.push({
         id: newId,
         title: cleanTitle,
         elapsed: 0,
@@ -2044,11 +2030,11 @@
       updateHeroMetrics();
       logTaskEventToSheets(cleanTitle, 'Created', 0);
       syncStateToSpreadsheet();
-      showToast(`Slot "${cleanTitle}" created and locked`);
+      showToast(`Slot "${cleanTitle}" locked to your spreadsheet`);
     }
 
     // ----------------------------------------------------
-    // Render Task Cards with SVG Clocks (Audit Item 3)
+    // Render Task Cards with SVG Clocks
     // ----------------------------------------------------
     function renderTasks() {
       clockElementCache.clear();
@@ -2058,10 +2044,14 @@
 
       tasks.forEach((task) => {
         const isRunning = task.isRunning;
+        const isBreak = isBreakOrLeisureTask(task.title);
+
         const card = document.createElement('div');
         card.id = `card-${task.id}`;
         card.className = `glass-panel rounded-3xl p-5 transition-all duration-300 relative flex flex-col justify-between ${
-          isRunning ? 'active-slot-glow bg-emerald-50/80 border-emerald-400' : 'hover:border-slate-300 shadow-xs'
+          isRunning
+            ? (isBreak ? 'active-rest-glow bg-amber-50/80 border-amber-400' : 'active-slot-glow bg-emerald-50/80 border-emerald-400')
+            : 'hover:border-slate-300 shadow-xs'
         }`;
 
         // Top Header
@@ -2072,7 +2062,10 @@
         titleDiv.className = 'flex items-center gap-2 min-w-0';
         titleDiv.innerHTML = `
           <span class="text-sm font-extrabold text-slate-900 truncate">${escapeHtml(task.title)}</span>
-          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 uppercase tracking-wider flex-shrink-0">Locked</span>
+          ${isBreak
+            ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 uppercase tracking-wider flex-shrink-0">Rest / Leisure</span>'
+            : '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800 uppercase tracking-wider flex-shrink-0">Focus</span>'
+          }
         `;
 
         topRow.appendChild(titleDiv);
@@ -2085,8 +2078,13 @@
         svgClock.setAttribute('viewBox', '0 0 100 100');
         svgClock.setAttribute('class', `w-20 h-20 mb-2 drop-shadow-sm clock-dial-svg ${isRunning ? 'scale-105' : 'opacity-85'} transition-transform`);
 
+        const dialBg = isRunning ? (isBreak ? '#fffbeb' : '#f0fdf4') : '#ffffff';
+        const dialBorder = isRunning ? (isBreak ? '#fbbf24' : '#34d399') : '#e2e8f0';
+        const hourStroke = isRunning ? (isBreak ? '#b45309' : '#065f46') : '#334155';
+        const minStroke = isRunning ? (isBreak ? '#f59e0b' : '#10b981') : '#64748b';
+
         svgClock.innerHTML = `
-          <circle cx="50" cy="50" r="46" fill="${isRunning ? '#f0fdf4' : '#ffffff'}" stroke="${isRunning ? '#34d399' : '#e2e8f0'}" stroke-width="3.5"/>
+          <circle cx="50" cy="50" r="46" fill="${dialBg}" stroke="${dialBorder}" stroke-width="3.5"/>
           
           <line x1="50" y1="8" x2="50" y2="14" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
           <line x1="92" y1="50" x2="86" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
@@ -2094,22 +2092,22 @@
           <line x1="8" y1="50" x2="14" y2="50" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
           
           <g id="clock-${task.id}-hour-group" class="clock-hand-group">
-            <line x1="50" y1="50" x2="50" y2="28" stroke="${isRunning ? '#065f46' : '#334155'}" stroke-width="3.8" stroke-linecap="round"/>
+            <line x1="50" y1="50" x2="50" y2="28" stroke="${hourStroke}" stroke-width="3.8" stroke-linecap="round"/>
           </g>
           <g id="clock-${task.id}-min-group" class="clock-hand-group">
-            <line x1="50" y1="50" x2="50" y2="18" stroke="${isRunning ? '#10b981' : '#64748b'}" stroke-width="2.6" stroke-linecap="round"/>
+            <line x1="50" y1="50" x2="50" y2="18" stroke="${minStroke}" stroke-width="2.6" stroke-linecap="round"/>
           </g>
           <g id="clock-${task.id}-sec-group" class="clock-hand-group">
             <line x1="50" y1="50" x2="50" y2="13" stroke="#ef4444" stroke-width="1.6" stroke-linecap="round"/>
           </g>
           
-          <circle cx="50" cy="50" r="3.8" fill="${isRunning ? '#059669' : '#475569'}"/>
+          <circle cx="50" cy="50" r="3.8" fill="${isRunning ? (isBreak ? '#d97706' : '#059669') : '#475569'}"/>
         `;
 
         const timerText = document.createElement('div');
         timerText.id = `timer-${task.id}`;
         timerText.className = `text-2xl sm:text-3xl font-black font-mono tracking-tight mt-1 ${
-          isRunning ? 'text-emerald-700' : 'text-slate-800'
+          isRunning ? (isBreak ? 'text-amber-700' : 'text-emerald-700') : 'text-slate-800'
         }`;
         timerText.textContent = formatTime(task.elapsed);
 
@@ -2122,17 +2120,22 @@
 
         const badge = document.createElement('span');
         badge.id = `badge-${task.id}`;
-        badge.className = `text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
-          isRunning ? 'bg-emerald-100 text-emerald-800 animate-pulse' : 'bg-slate-100 text-slate-500'
-        }`;
-        badge.textContent = isRunning ? 'FOCUSING' : 'IDLE';
+        if (isRunning) {
+          badge.className = `text-[10px] font-extrabold px-2.5 py-1 rounded-full animate-pulse ${
+            isBreak ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+          }`;
+          badge.textContent = isBreak ? 'RESTING' : 'FOCUSING';
+        } else {
+          badge.className = 'text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500';
+          badge.textContent = 'IDLE';
+        }
 
         const toggleBtn = document.createElement('button');
         toggleBtn.id = `btn-${task.id}`;
         toggleBtn.className = `px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs ${
           isRunning
-            ? 'bg-amber-500 hover:bg-amber-600 text-white'
-            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+            ? 'bg-slate-800 hover:bg-slate-900 text-white'
+            : isBreak ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
         }`;
         toggleBtn.innerHTML = isRunning
           ? '<i class="fa-solid fa-pause"></i><span>Pause</span>'
@@ -2170,12 +2173,12 @@
     }
 
     // ----------------------------------------------------
-    // Focus Points & Trophy Milestones (Audit Item 9)
+    // Points & Trophy Quotas (Pure Productive Focus Only)
     // ----------------------------------------------------
     function checkFocusHourPointsMilestone() {
-      if (!isCloudHydrated) return;
-      const totalSeconds = getTotalFocusSecondsToday();
-      const currentFullHours = Math.floor(totalSeconds / 3600);
+      // ONLY pure productive focus awards points (Rest/Timepass excluded)
+      const productiveSeconds = getProductiveFocusSecondsToday();
+      const currentFullHours = Math.floor(productiveSeconds / 3600);
 
       if (currentFullHours > awardedHourlyPoints) {
         const pointsToAdd = currentFullHours - awardedHourlyPoints;
@@ -2194,7 +2197,7 @@
       const titleEl = document.getElementById('pointsEarnedTitle');
       const descEl = document.getElementById('pointsEarnedDesc');
       if (titleEl) titleEl.textContent = `+${pointsEarned} Focus Point${pointsEarned > 1 ? 's' : ''} Earned!`;
-      if (descEl) descEl.textContent = `You reached ${awardedHourlyPoints} hour${awardedHourlyPoints > 1 ? 's' : ''} of focus today. Redeem points for themes & passes!`;
+      if (descEl) descEl.textContent = `You completed ${awardedHourlyPoints} hour${awardedHourlyPoints > 1 ? 's' : ''} of genuine focus today. Rest time does not count.`;
 
       document.getElementById('pointsEarnedModal').classList.remove('hidden');
       if (typeof confetti === 'function') {
@@ -2207,9 +2210,9 @@
     }
 
     function checkTrophyMilestones() {
-      if (!isCloudHydrated) return;
-      const totalSeconds = getTotalFocusSecondsToday();
-      const hours = totalSeconds / 3600;
+      // ONLY pure productive focus meets Trophy criteria (Rest/Timepass excluded)
+      const productiveSeconds = getProductiveFocusSecondsToday();
+      const hours = productiveSeconds / 3600;
 
       const currentDay = getTodayString();
       if (trophiesClaimDate !== currentDay) {
@@ -2238,17 +2241,17 @@
         badgeBg.className = 'w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-3 animate-bounce bg-amber-100 text-amber-800';
         icon.className = 'fa-solid fa-award';
         title.textContent = 'Bronze Trophy Ready!';
-        desc.textContent = "You've surpassed 4 hours of dedicated focus today. Collect your daily trophy!";
+        desc.textContent = "You've completed 4 hours of pure focus time today! (Rest/Timepass excluded). Collect your trophy!";
       } else if (tier === 'silver') {
         badgeBg.className = 'w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-3 animate-bounce bg-slate-200 text-slate-800';
         icon.className = 'fa-solid fa-medal';
         title.textContent = 'Silver Trophy Ready!';
-        desc.textContent = "8 hours of deep focus completed today! Collect your daily silver trophy & build your Diamond streak!";
+        desc.textContent = "8 hours of pure deep focus completed today! Collect your daily silver trophy & extend your Diamond streak!";
       } else if (tier === 'golden') {
         badgeBg.className = 'w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl mb-3 animate-bounce bg-yellow-300 text-yellow-900';
         icon.className = 'fa-solid fa-crown';
         title.textContent = 'Golden Trophy Ready!';
-        desc.textContent = "15 hours of ultimate focus! An unbelievable milestone achieved today!";
+        desc.textContent = "15 hours of ultimate focus! Unstoppable dedication!";
       }
 
       modal.classList.remove('hidden');
@@ -2317,7 +2320,6 @@
       updateBumperUI();
     }
 
-    // Strict Diamond & Stage Assertions (Audit Item 7)
     function updateBumperUI() {
       const stageBadge = document.getElementById('bumperStageBadge');
       const reqDesc = document.getElementById('bumperReqDesc');
@@ -2427,7 +2429,7 @@
     }
 
     // ----------------------------------------------------
-    // Shop & Points System (Audit Items 8 & 13)
+    // Shop & Points System
     // ----------------------------------------------------
     function updatePointsDisplay() {
       const hEl = document.getElementById('headerPointsCount');
@@ -2449,7 +2451,6 @@
     async function redeemShopSubscription(days, cost) {
       if (isShopPurchasing) return;
 
-      // Strict non-negative balance guard (Audit Item 8)
       if (userPoints < cost || (userPoints - cost) < 0) {
         showToast(`Need ${cost - userPoints} more points for this pass`);
         return;
@@ -2469,7 +2470,6 @@
 
         const now = Date.now();
         const current = subscriptionExpiry > now ? subscriptionExpiry : now;
-        // Integer-safe addition (Audit Item 13)
         const addedMs = days * 24 * 60 * 60 * 1000;
         subscriptionExpiry = Math.min(Number.MAX_SAFE_INTEGER, current + addedMs);
 
@@ -2598,7 +2598,6 @@
       document.getElementById('driveWallpaperModal').classList.add('hidden');
     }
 
-    // Strict Image URL Sanitization (Audit Item 12)
     function confirmApplyDriveWallpaper() {
       const input = document.getElementById('driveWallpaperInput');
       const val = input.value.trim();
@@ -2624,7 +2623,6 @@
       showToast('Google Drive wallpaper applied successfully!');
     }
 
-    // Wallpaper clearing and opacity reset (Audit Item 19)
     function applyWorkspaceTheme(themeKey, wallpaperUrl) {
       document.body.classList.remove('theme-midnight', 'theme-forest');
       const wpEl = document.getElementById('wallpaperBackdrop');
@@ -2645,7 +2643,7 @@
     }
 
     // ----------------------------------------------------
-    // Midnight Reset Architecture (Audit Items 2 & 20)
+    // Midnight Reset (Keeps All Slots, Resets Clocks to 0)
     // ----------------------------------------------------
     function getTodayString() {
       const d = new Date();
@@ -2656,7 +2654,6 @@
       const now = new Date();
       const currentDay = getTodayString();
 
-      // Multi-day midnight rollover handler (Audit Item 20)
       if (lastTrackedDate && lastTrackedDate !== currentDay) {
         lastTrackedDate = currentDay;
         await handleMidnightBoundaryRollover();
@@ -2676,6 +2673,7 @@
 
     async function handleMidnightBoundaryRollover() {
       const now = Date.now();
+      // ALL task slots retain their names and positions; ONLY today's elapsed seconds reset to 0
       for (const task of tasks) {
         if (task.isRunning && task.lastStarted) {
           const preMidnightSeconds = (now - task.lastStarted) / 1000;
@@ -2691,25 +2689,20 @@
       trophiesClaimedToday = [];
       awardedHourlyPoints = 0;
 
+      renderTasks();
       updateHeroMetrics();
       updateTrophiesDisplay();
       await syncStateToSpreadsheet();
     }
 
     // ----------------------------------------------------
-    // Usage & Subscription System (Zero Blocker on Boot)
+    // Usage & Subscription System
     // ----------------------------------------------------
     function isSubscriptionActive() {
       return subscriptionExpiry > Date.now();
     }
 
     function enforceSubscriptionCheck() {
-      if (!accessToken || !isCloudHydrated) {
-        const expiredGate = document.getElementById('expiredSubscriptionGate');
-        if (expiredGate) expiredGate.classList.add('hidden');
-        return;
-      }
-
       const expiredGate = document.getElementById('expiredSubscriptionGate');
       const usageModal = document.getElementById('usageModal');
       const isUsageModalOpen = usageModal && !usageModal.classList.contains('hidden');
@@ -2730,7 +2723,7 @@
       const expiredGate = document.getElementById('expiredSubscriptionGate');
 
       if (expiredGate) expiredGate.classList.add('hidden');
-      if (forced || (!isSubscriptionActive() && accessToken && isCloudHydrated)) {
+      if (forced || !isSubscriptionActive()) {
         if (closeBtn) closeBtn.classList.add('hidden');
       } else {
         if (closeBtn) closeBtn.classList.remove('hidden');
@@ -2741,7 +2734,7 @@
     }
 
     function closeUsageModal() {
-      if (accessToken && isCloudHydrated && !isSubscriptionActive()) {
+      if (!isSubscriptionActive()) {
         document.getElementById('usageModal').classList.add('hidden');
         document.getElementById('expiredSubscriptionGate').classList.remove('hidden');
         return;
@@ -2769,12 +2762,6 @@
       const planStatusEl = document.getElementById('usagePlanStatus');
       const msgEl = document.getElementById('usageStatusMessage');
       const badgeEl = document.getElementById('drawerUsageBadge');
-
-      if (!isCloudHydrated && accessToken) {
-        if (planStatusEl) planStatusEl.textContent = 'Syncing Cloud Plan...';
-        if (msgEl) msgEl.textContent = 'Retrieving your active subscription from Google Sheets.';
-        return;
-      }
 
       if (diff > 0) {
         if (planStatusEl) planStatusEl.textContent = 'Active Subscription';
@@ -2830,10 +2817,9 @@
     }
 
     // ----------------------------------------------------
-    // Analytics Dashboard (Audit Items 6 & 14)
+    // Analytics Dashboard (Focus vs. Rest Segregation)
     // ----------------------------------------------------
     async function openAnalyticsDashboardModal() {
-      if (!accessToken) { requestGoogleToken(true); return; }
       document.getElementById('analyticsModal').classList.remove('hidden');
       await refreshAnalyticsData(true);
 
@@ -2881,10 +2867,14 @@
 
     async function refreshAnalyticsData(showSpinner = false) {
       const sheetId = localStorage.getItem(STORAGE_KEY_SHEET_ID);
-      if (!sheetId || !accessToken) return;
-
       const spinIcon = document.getElementById('refreshIconSpin');
       if (showSpinner && spinIcon) spinIcon.classList.add('fa-spin');
+
+      if (!sheetId || !accessToken) {
+        processAndRenderAnalytics([]);
+        if (spinIcon) spinIcon.classList.remove('fa-spin');
+        return;
+      }
 
       try {
         const res = await authFetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Task_Logs!A2:G`);
@@ -2892,8 +2882,11 @@
           const data = await res.json();
           cachedAnalyticsRows = data.values || [];
           processAndRenderAnalytics(cachedAnalyticsRows);
+        } else {
+          processAndRenderAnalytics([]);
         }
       } catch(e) {
+        processAndRenderAnalytics([]);
       } finally {
         if (spinIcon) spinIcon.classList.remove('fa-spin');
       }
@@ -2906,44 +2899,80 @@
       const weekStr = `W${getISOWeekNumber(now)}`;
 
       const taskDurations = {};
+      let productiveMinutes = 0;
       let totalMinutes = 0;
-      let eventCount = 0;
 
-      rows.forEach(r => {
-        const rowDate = r[1];
-        const rowWeek = r[2];
-        const rowMonth = r[3];
-        const taskName = r[4];
-        const duration = parseFloat(r[6]) || 0;
+      // 1. Process Google Sheets Task_Logs rows
+      if (Array.isArray(rows) && rows.length > 0) {
+        rows.forEach(r => {
+          if (!r || r.length < 5) return;
+          const rowDate = (r[1] || '').trim();
+          const rowWeek = (r[2] || '').trim();
+          const rowMonth = (r[3] || '').trim();
+          const taskName = (r[4] || '').trim();
+          const duration = parseFloat(r[6]) || 0;
 
-        let match = false;
-        if (currentAnalyticsRange === 'daily' && rowDate === todayStr) match = true;
-        if (currentAnalyticsRange === 'weekly' && rowWeek === weekStr) match = true;
-        if (currentAnalyticsRange === 'monthly' && rowMonth === monthStr) match = true;
+          let match = false;
+          if (currentAnalyticsRange === 'daily' && rowDate === todayStr) match = true;
+          if (currentAnalyticsRange === 'weekly' && rowWeek === weekStr) match = true;
+          if (currentAnalyticsRange === 'monthly' && rowMonth === monthStr) match = true;
 
-        if (match && taskName) {
-          eventCount++;
-          totalMinutes += duration;
-          taskDurations[taskName] = (taskDurations[taskName] || 0) + duration;
-        }
-      });
+          if (match && taskName) {
+            totalMinutes += duration;
+            if (!isBreakOrLeisureTask(taskName)) {
+              productiveMinutes += duration;
+            }
+            taskDurations[taskName] = (taskDurations[taskName] || 0) + duration;
+          }
+        });
+      }
 
-      const hours = Math.floor(totalMinutes / 60);
-      const mins = Math.round(totalMinutes % 60);
-      document.getElementById('modalFilteredDuration').textContent = `${hours}h ${mins}m`;
-      document.getElementById('modalLogCount').textContent = eventCount;
+      // 2. Real-time active task overlay for Daily view
+      if (currentAnalyticsRange === 'daily') {
+        const nowDate = Date.now();
+        tasks.forEach(t => {
+          let runningMins = 0;
+          if (t.isRunning && t.lastStarted) {
+            runningMins = ((nowDate - t.lastStarted) / 1000) / 60;
+          }
+          const taskTotalMins = (t.elapsed / 60) + runningMins;
+          if (taskTotalMins > 0) {
+            if (!taskDurations[t.title] || taskDurations[t.title] < taskTotalMins) {
+              const diff = taskTotalMins - (taskDurations[t.title] || 0);
+              totalMinutes += diff;
+              if (!isBreakOrLeisureTask(t.title)) {
+                productiveMinutes += diff;
+              }
+              taskDurations[t.title] = taskTotalMins;
+            }
+          }
+        });
+      }
+
+      // Display Pure Focus (Quotas)
+      const fHours = Math.floor(productiveMinutes / 60);
+      const fMins = Math.round(productiveMinutes % 60);
+      document.getElementById('modalFilteredDuration').textContent = `${fHours}h ${fMins}m`;
+
+      // Display Overall Total Tracked
+      const tHours = Math.floor(totalMinutes / 60);
+      const tMins = Math.round(totalMinutes % 60);
+      document.getElementById('modalTotalDuration').textContent = `${tHours}h ${tMins}m`;
 
       let topTask = 'None';
       let maxVal = -1;
       Object.entries(taskDurations).forEach(([k, v]) => {
-        if (v > maxVal) { maxVal = v; topTask = k; }
+        if (!isBreakOrLeisureTask(k) && v > maxVal) {
+          maxVal = v;
+          topTask = k;
+        }
       });
       document.getElementById('modalTopTaskName').textContent = topTask;
 
-      renderAnalyticsCharts(taskDurations);
+      renderAnalyticsCharts(taskDurations, productiveMinutes, Math.max(0, totalMinutes - productiveMinutes));
     }
 
-    function renderAnalyticsCharts(dataMap) {
+    function renderAnalyticsCharts(dataMap, productiveMins, restMins) {
       const barCanvas = document.getElementById('analyticsBarChart');
       const pieCanvas = document.getElementById('analyticsPieChart');
       if (!barCanvas || !pieCanvas) return;
@@ -2981,16 +3010,28 @@
         }
       });
 
+      // Pie Chart: Productive Focus vs. Rest/Timepass
+      const hasData = (productiveMins + restMins) > 0;
       pieChartInstance = new Chart(pieCanvas.getContext('2d'), {
         type: 'doughnut',
         data: {
-          labels: labels.length ? labels : ['No Logs'],
-          datasets: [{ data: values.length ? values : [1], backgroundColor: values.length ? palette : ['#e2e8f0'], borderWidth: 3, borderColor: '#ffffff' }]
+          labels: hasData ? ['Pure Focus (Quotas)', 'Rest / Timepass'] : ['No Logs Yet'],
+          datasets: [{
+            data: hasData ? [Math.round(productiveMins), Math.round(restMins)] : [1],
+            backgroundColor: hasData ? ['#2563eb', '#f59e0b'] : ['#e2e8f0'],
+            borderWidth: 3,
+            borderColor: '#ffffff'
+          }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 14, font: { family: '"Plus Jakarta Sans"', size: 11, weight: '600' } } } },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 10, padding: 14, font: { family: '"Plus Jakarta Sans"', size: 11, weight: '600' } }
+            }
+          },
           cutout: '70%'
         }
       });
@@ -3011,7 +3052,7 @@
     }
 
     // ----------------------------------------------------
-    // Wake Lock & Audio Context (Audit Item 4)
+    // Wake Lock & Audio Context
     // ----------------------------------------------------
     async function activateWakeLock() {
       try {
@@ -3070,7 +3111,6 @@
     function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
     function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
 
-    // Strict Google File ID extraction (Audit Item 5)
     function extractGoogleFileId(val) {
       if (!val) return '';
       const match = val.trim().match(/\/d\/([a-zA-Z0-9-_]{25,})|\/file\/d\/([a-zA-Z0-9-_]{25,})|id=([a-zA-Z0-9-_]{25,})|^([a-zA-Z0-9-_]{25,})$/);
@@ -3105,21 +3145,6 @@
       if (!accessToken) requestGoogleToken(true);
       else syncWithSpreadsheet();
     }
-
-    function promptPWAInstall() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
-      } else {
-        showToast('To install, tap your browser menu and choose "Install App"');
-      }
-    }
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      const btn = document.getElementById('pwaInstallBtn');
-      if (btn) btn.classList.remove('hidden');
-    });
 
     function showToast(msg) {
       const t = document.getElementById('toast');
